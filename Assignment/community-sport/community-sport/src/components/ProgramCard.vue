@@ -3,6 +3,7 @@ const props = defineProps({
   program: { type: Object, required: true }
 });
 
+// Use a local placeholder so cards never break if an image path is missing
 const fallbackImg = '/src/assets/images/placeholder-program.jpg';
 </script>
 
@@ -26,9 +27,7 @@ const fallbackImg = '/src/assets/images/placeholder-program.jpg';
         {{ program.venue?.suburb || 'Melbourne' }}
       </p>
 
-      <p class="card-text flex-grow-1 mb-2">
-        {{ program.description }}
-      </p>
+      <p class="card-text flex-grow-1 mb-2">{{ program.description }}</p>
 
       <div class="d-flex gap-2 flex-wrap mb-3">
         <span
@@ -44,12 +43,12 @@ const fallbackImg = '/src/assets/images/placeholder-program.jpg';
         <span class="fw-semibold">
           {{ program.cost === 0 ? 'Free' : `$${program.cost} ${program.costUnit || ''}` }}
         </span>
-        <router-link
+        <RouterLink
           class="btn btn-outline-primary btn-sm"
           :to="{ name: 'program', params: { id: program.id } }"
         >
           View
-        </router-link>
+        </RouterLink>
       </div>
     </div>
   </div>

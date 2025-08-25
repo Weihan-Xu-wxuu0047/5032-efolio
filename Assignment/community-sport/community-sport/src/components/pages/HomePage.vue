@@ -1,20 +1,22 @@
 <script setup>
 import { computed } from 'vue';
-import SearchBar from '@/components/SearchBar.vue';
-import ProgramCard from '@/components/ProgramCard.vue';
+import SearchBar from '../SearchBar.vue';
+import ProgramCard from '../ProgramCard.vue';
 
-// Static import is simplest with Vite
-import programs from '@/assets/data/programs.json';
+// Use relative import from /src/components/pages/ → /src/assets/data/
+import programs from '../../assets/data/programs.json';
 
+// Hero copy (static)
 const hero = {
   title: 'Move more, feel better.',
   subtitle:
     'Discover inclusive, low-cost community sport programs across Melbourne. Start with a quick search below.'
 };
 
-// “Featured” logic: prioritise beginner-friendly or low-cost, then cap to 6
+// Score & pick up to 6 items for "Featured"
 const featured = computed(() => {
-  const withScore = programs.map(p => {
+  const list = Array.isArray(programs) ? programs : [];
+  const withScore = list.map(p => {
     let score = 0;
     if (p.inclusivityTags?.includes('beginner-friendly')) score += 2;
     if (p.cost === 0) score += 2;
@@ -24,11 +26,6 @@ const featured = computed(() => {
   withScore.sort((a, b) => b._score - a._score || a.cost - b.cost);
   return withScore.slice(0, 6);
 });
-
-function onSearch(q) {
-  // SearchBar also navigates itself; this is here if you want analytics later
-  // console.log('home search', q);
-}
 </script>
 
 <template>
@@ -40,10 +37,7 @@ function onSearch(q) {
         {{ hero.subtitle }}
       </p>
       <div class="mt-3 mt-lg-4 d-flex justify-content-center">
-        <SearchBar
-          placeholder="Try ‘netball’, ‘walking football’, ‘wheelchair access’…"
-          @submit="onSearch"
-        />
+        <SearchBar placeholder="Try ‘netball’, ‘walking football’, ‘wheelchair access’…" />
       </div>
     </section>
 
@@ -51,7 +45,7 @@ function onSearch(q) {
     <section aria-labelledby="featured-heading">
       <div class="d-flex align-items-baseline justify-content-between mb-2">
         <h2 id="featured-heading" class="h4 m-0">Featured programs</h2>
-        <router-link :to="{ name: 'find' }" class="link-primary">See all</router-link>
+        <RouterLink :to="{ name: 'find' }" class="link-primary">See all</RouterLink>
       </div>
 
       <!-- Responsive grid: 1 / 2 / 3 columns -->

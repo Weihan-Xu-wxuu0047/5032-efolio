@@ -1,0 +1,158 @@
+[
+  {
+    "id": "prog-003",
+    "title": "Youth Basketball — Community Hoops",
+    "sport": "Basketball",
+    "description": "Fun and energetic basketball sessions for teens with qualified coaches.",
+    "ageGroups": ["12-17"],
+    "cost": 8,
+    "costUnit": "per-session",
+    "accessibility": ["accessible-toilets"],
+    "inclusivityTags": ["youth", "team-sport"],
+    "schedule": [
+      {
+        "day": "Friday",
+        "start": "16:00",
+        "end": "17:30",
+        "frequency": "weekly",
+        "startDate": "2025-08-15",
+        "endDate": null
+      }
+    ],
+    "venue": {
+      "name": "Carlton Youth Centre",
+      "address": "88 Rathdowne St",
+      "suburb": "Carlton",
+      "postcode": "3053",
+      "lat": -37.803,
+      "lng": 144.971
+    },
+    "equipment": {
+      "provided": true,
+      "required": ["sports shoes"]
+    },
+    "contact": {
+      "email": "coach@communityhoops.org",
+      "phone": "03 9123 4567"
+    },
+    "images": ["/assets/images/basketball.jpg"],
+    "maxParticipants": 25
+  },
+  {
+    "id": "prog-004",
+    "title": "Inclusive Yoga — Mind & Body",
+    "sport": "Yoga",
+    "description": "Gentle yoga classes with adaptations for different ability levels.",
+    "ageGroups": ["18-40", "40-60", "60+"],
+    "cost": 12,
+    "costUnit": "per-class",
+    "accessibility": ["wheelchair-access", "quiet-area"],
+    "inclusivityTags": ["inclusive", "low-impact", "stress-relief"],
+    "schedule": [
+      {
+        "day": "Tuesday",
+        "start": "19:00",
+        "end": "20:00",
+        "frequency": "weekly",
+        "startDate": "2025-08-12",
+        "endDate": null
+      }
+    ],
+    "venue": {
+      "name": "Wellness Studio",
+      "address": "12 High St",
+      "suburb": "Prahran",
+      "postcode": "3181",
+      "lat": -37.849,
+      "lng": 144.994
+    },
+    "equipment": {
+      "provided": false,
+      "required": ["yoga mat"]
+    },
+    "contact": {
+      "email": "info@wellnessstudio.org",
+      "phone": "03 9345 6789"
+    },
+    "images": ["/assets/images/yoga.jpg"],
+    "maxParticipants": 15
+  },
+  {
+    "id": "prog-005",
+    "title": "Community Running Group — Early Risers",
+    "sport": "Running",
+    "description": "Social 5km runs along the Yarra, suitable for all levels.",
+    "ageGroups": ["18-40", "40-60"],
+    "cost": 0,
+    "costUnit": "free",
+    "accessibility": ["pet-friendly"],
+    "inclusivityTags": ["social", "outdoor", "low-cost"],
+    "schedule": [
+      {
+        "day": "Saturday",
+        "start": "07:00",
+        "end": "08:00",
+        "frequency": "weekly",
+        "startDate": "2025-08-23",
+        "endDate": null
+      }
+    ],
+    "venue": {
+      "name": "Yarra Park",
+      "address": "Brunton Ave",
+      "suburb": "East Melbourne",
+      "postcode": "3002",
+      "lat": -37.819,
+      "lng": 144.983
+    },
+    "equipment": {
+      "provided": false,
+      "required": ["running shoes"]
+    },
+    "contact": {
+      "email": "runclub@earlyrisers.org",
+      "phone": "03 9988 7766"
+    },
+    "images": ["/assets/images/running.jpg"],
+    "maxParticipants": 50
+  },
+  {
+    "id": "prog-006",
+    "title": "Adaptive Swimming — All Abilities",
+    "sport": "Swimming",
+    "description": "Supportive swimming lessons for people with disabilities, led by trained instructors.",
+    "ageGroups": ["8-12", "12-17", "18-40"],
+    "cost": 15,
+    "costUnit": "per-session",
+    "accessibility": ["pool-lift", "accessible-toilets", "family-change-rooms"],
+    "inclusivityTags": ["inclusive", "all-abilities", "confidence-building"],
+    "schedule": [
+      {
+        "day": "Sunday",
+        "start": "11:00",
+        "end": "12:00",
+        "frequency": "weekly",
+        "startDate": "2025-09-01",
+        "endDate": null
+      }
+    ],
+    "venue": {
+      "name": "Richmond Aquatic Centre",
+      "address": "1 Church St",
+      "suburb": "Richmond",
+      "postcode": "3121",
+      "lat": -37.827,
+      "lng": 145.002
+    },
+    "equipment": {
+      "provided": true,
+      "required": ["swimsuit", "towel"]
+    },
+    "contact": {
+      "email": "swim@richmondaquatic.org",
+      "phone": "03 9333 1122"
+    },
+    "images": ["/assets/images/swimming.jpg"],
+    "maxParticipants": 12
+  }
+]
