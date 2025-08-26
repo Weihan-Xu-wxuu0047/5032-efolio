@@ -3,7 +3,7 @@ import FaqAccordion from '../FaqAccordion.vue';
 import ContactForm from '../ContactForm.vue';
 
 // Load local dynamic data
-import faqs from '../../assets/data/faqs.js';
+import faqs from '../../assets/data/faqs.json';
 </script>
 
 <template>
