@@ -1,48 +1,8 @@
-import { createRouter, createWebHistory } from 'vue-router';
-
-const routes = [
-  {
-    path: '/',
-    name: 'home',
-    component: () => import('@/components/pages/HomePage.vue'),
-    meta: { title: 'Home · Community Sport' }
-  },
-  {
-    path: '/find',
-    name: 'find',
-    component: () => import('@/components/pages/FindSportsPage.vue'),
-    meta: { title: 'Find Sports · Community Sport' }
-    // Access search text via route.query.q (e.g., /find?q=netball)
-  },
-  {
-    path: '/program/:id',
-    name: 'program',
-    props: true, // passes { id } as a prop
-    component: () => import('@/components/pages/ProgramDetailsPage.vue'),
-    meta: { title: 'Program Details · Community Sport' }
-  },
-  {
-    path: '/support',
-    name: 'support',
-    component: () => import('@/components/pages/SupportPage.vue'),
-    meta: { title: 'Support · Community Sport' }
-  },
-  // keep it simple for now: redirect any unknown route to home
-  { path: '/:pathMatch(.*)*', redirect: '/' }
+// src/assets/data/faqs.js
+export default [
+  { id: 'faq-1', question: 'What sports are available?', answer: 'We list netball, football, yoga, swimming, and more.' },
+  { id: 'faq-2', question: 'How much do sessions cost?', answer: 'Many are free or low-cost (e.g., $5 per session).' },
+  { id: 'faq-3', question: 'Is the site accessible?', answer: 'We follow WCAG 2.1 AA and include keyboard and screen-reader support.' },
+  { id: 'faq-4', question: 'How do I register interest?', answer: 'Open a program detail page and use the form to send your interest.' },
+  { id: 'faq-5', question: 'Can I filter programs?', answer: 'Yes—use the Find Sports page to filter by sport, age, cost, and accessibility.' }
 ];
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-  scrollBehavior() {
-    // Always scroll to top on route change (helps mobile usability)
-    return { top: 0 };
-  }
-});
-
-// Optional: update document title from route meta
-router.afterEach((to) => {
-  if (to.meta?.title) document.title = to.meta.title;
-});
-
-export default router;
