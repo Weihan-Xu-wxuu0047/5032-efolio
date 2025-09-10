@@ -53,6 +53,62 @@
               Support
             </RouterLink>
           </li>
+          
+          <!-- Authentication Navigation -->
+          <li v-if="!isAuthenticated" class="nav-item">
+            <RouterLink
+              :to="{ name: 'login' }"
+              class="nav-link"
+              :class="linkActiveClass('login')"
+            >
+              <i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>
+              Login
+            </RouterLink>
+          </li>
+          <li v-if="!isAuthenticated" class="nav-item">
+            <RouterLink
+              :to="{ name: 'register' }"
+              class="nav-link"
+              :class="linkActiveClass('register')"
+            >
+              <i class="bi bi-person-plus me-1" aria-hidden="true"></i>
+              Register
+            </RouterLink>
+          </li>
+          
+          <!-- Account Dropdown (when authenticated) -->
+          <li v-if="isAuthenticated" class="nav-item dropdown">
+            <a
+              class="nav-link dropdown-toggle d-flex align-items-center"
+              href="#"
+              id="accountDropdown"
+              role="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+              Account
+              <span v-if="currentRole" class="badge bg-secondary ms-2 text-capitalize">{{ currentRole }}</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountDropdown">
+              <li>
+                <RouterLink
+                  :to="{ name: accountPageRoute }"
+                  class="dropdown-item"
+                >
+                  <i class="bi bi-person-gear me-2" aria-hidden="true"></i>
+                  My {{ currentRole }} Account
+                </RouterLink>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <button @click="handleLogout" class="dropdown-item">
+                  <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>
+                  Logout
+                </button>
+              </li>
+            </ul>
+          </li>
         </ul>
       </div>
     </div>
@@ -60,7 +116,6 @@
 
   <!-- Main outlet -->
   <main id="main-content">
-    <!-- Let pages decide their own container spacing; Home uses .container -->
     <RouterView />
   </main>
 
@@ -87,9 +142,24 @@
 </template>
 
 <script setup>
-import { useRoute } from 'vue-router';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import authService from './services/AuthService.js';
 
 const route = useRoute();
+const router = useRouter();
+
+// Authentication state
+const currentUser = ref(null);
+const currentRole = ref(null);
+const unsubscribeAuth = ref(null);
+
+// Computed properties
+const isAuthenticated = computed(() => !!currentUser.value);
+
+const accountPageRoute = computed(() => {
+  return currentRole.value === 'organizer' ? 'organizer-account' : 'member-account';
+});
 
 /**
  * Returns 'active' for the current named route so Bootstrap can style it.
@@ -98,6 +168,37 @@ const route = useRoute();
 function linkActiveClass(name) {
   return route.name === name ? 'active' : '';
 }
+
+// Handle logout
+async function handleLogout() {
+  try {
+    await authService.logout();
+    router.push({ name: 'home' });
+  } catch (error) {
+    console.error('Logout error:', error);
+  }
+}
+
+// Setup auth state listener
+onMounted(() => {
+  // Get initial auth state
+  const authState = authService.getCurrentUser();
+  currentUser.value = authState.user;
+  currentRole.value = authState.role;
+
+  // Subscribe to auth state changes
+  unsubscribeAuth.value = authService.onAuthStateChange((user, role) => {
+    currentUser.value = user;
+    currentRole.value = role;
+  });
+});
+
+// Cleanup
+onUnmounted(() => {
+  if (unsubscribeAuth.value) {
+    unsubscribeAuth.value();
+  }
+});
 </script>
 
 <style>
