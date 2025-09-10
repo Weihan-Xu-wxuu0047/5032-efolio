@@ -40,21 +40,38 @@ const routes = [
 const router = createRouter({ history: createWebHistory(), routes });
 
 // Route guards
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresRole = to.meta.requiresRole;
-  const currentUser = authService.getCurrentUser();
   
-  if (requiresAuth && !currentUser.user) {
+  // Use synchronous method for route guard (faster)
+  const currentUserSync = authService.getCurrentUserSync();
+  
+  if (requiresAuth && !currentUserSync.user) {
     // Redirect to login if authentication is required
     next({ name: 'login' });
     return;
   }
   
-  if (requiresRole && currentUser.role !== requiresRole) {
-    // Redirect to home if user doesn't have required role
-    next({ name: 'home' });
-    return;
+  if (requiresRole && currentUserSync.role !== requiresRole) {
+    // If we don't have role data yet, get it from Firestore
+    if (!currentUserSync.role && currentUserSync.user) {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser.role !== requiresRole) {
+          next({ name: 'home' });
+          return;
+        }
+      } catch (error) {
+        console.error('Route guard error:', error);
+        next({ name: 'home' });
+        return;
+      }
+    } else {
+      // Redirect to home if user doesn't have required role
+      next({ name: 'home' });
+      return;
+    }
   }
   
   next();

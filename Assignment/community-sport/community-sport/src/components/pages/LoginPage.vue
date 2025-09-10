@@ -300,9 +300,16 @@ async function handleLogin() {
       form.loginType
     );
 
+   
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Redirect to appropriate account page
     const targetPage = form.loginType === 'organizer' ? 'organizer-account' : 'member-account';
-    router.push({ name: targetPage });
+    console.log('Login successful, redirecting to:', targetPage);
+    console.log('User role:', result.role);
+    
+    await router.push({ name: targetPage });
+    console.log('Redirect completed');
 
   } catch (error) {
     errorMessage.value = error.message;
