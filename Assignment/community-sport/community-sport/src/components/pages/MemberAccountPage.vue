@@ -6,66 +6,101 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
           <div>
             <h1 class="h3 mb-1">Member Dashboard</h1>
-            <p class="text-muted mb-0">Welcome back, {{ userEmail }}</p>
+            <p class="text-muted mb-0">Manage your sports activities and programs</p>
           </div>
-          <button @click="handleLogout" class="btn btn-outline-secondary">
-            <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>
-            Logout
-          </button>
+          <div class="d-flex gap-2">
+            <RoleSwitcher />
+            <button @click="handleLogout" class="btn btn-outline-secondary">
+              <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>
+              Logout
+            </button>
+          </div>
         </div>
 
-        <!-- Placeholder Content -->
-        <div class="row g-4">
-          <div class="col-12">
-            <div class="card">
-              <div class="card-body text-center py-5">
-                <i class="bi bi-person-circle display-1 text-muted mb-3" aria-hidden="true"></i>
-                <h4 class="card-title">Member Account Page</h4>
-                <p class="card-text text-muted">
-                  This page is reserved for future development.<br>
-                  Member-specific features will be implemented here.
-                </p>
-                <div class="mt-4">
-                  <RouterLink :to="{ name: 'home' }" class="btn btn-primary me-2">
-                    <i class="bi bi-house me-2" aria-hidden="true"></i>
-                    Go to Home
-                  </RouterLink>
-                  <RouterLink :to="{ name: 'find' }" class="btn btn-outline-primary">
-                    <i class="bi bi-search me-2" aria-hidden="true"></i>
-                    Find Sports
-                  </RouterLink>
-                </div>
-              </div>
+        <!-- My Account Component -->
+        <MyAccount />
+
+        <!-- My Programs Section -->
+        <div class="card">
+          <div class="card-header bg-light">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-calendar-event me-2" aria-hidden="true"></i>
+              My Programs
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="text-center py-5">
+              <i class="bi bi-calendar-plus display-4 text-muted mb-3" aria-hidden="true"></i>
+              <h6 class="text-muted mb-3">No Programs Yet</h6>
+              <p class="text-muted mb-4">
+                You haven't joined any programs yet. Start exploring and join programs that interest you!
+              </p>
+              <RouterLink :to="{ name: 'find' }" class="btn btn-primary">
+                <i class="bi bi-search me-2" aria-hidden="true"></i>
+                Find Sports Programs
+              </RouterLink>
+            </div>
+            
+            <!-- Future: Program cards will be displayed here -->
+            <div class="d-none" id="programs-list">
+              <!-- This section is reserved for displaying user's programs -->
+              <!-- Will show program cards with details like:
+                   - Program name and sport
+                   - Schedule and venue
+                   - Registration status
+                   - Actions (view details, cancel registration, etc.)
+              -->
             </div>
           </div>
         </div>
 
-        <!-- Future Features Preview -->
-        <div class="row g-4 mt-2">
-          <div class="col-md-4">
-            <div class="card h-100 border-0 bg-light">
-              <div class="card-body text-center">
-                <i class="bi bi-calendar-event text-primary mb-3" style="font-size: 2rem;" aria-hidden="true"></i>
-                <h6 class="card-title">My Registrations</h6>
-                <p class="card-text text-muted small">View and manage your program registrations</p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="row g-4 mt-4">
+          <div class="col-md-3">
             <div class="card h-100 border-0 bg-light">
               <div class="card-body text-center">
                 <i class="bi bi-heart text-primary mb-3" style="font-size: 2rem;" aria-hidden="true"></i>
                 <h6 class="card-title">Favorites</h6>
                 <p class="card-text text-muted small">Your saved programs and activities</p>
+                <button class="btn btn-outline-primary btn-sm" disabled>
+                  Coming Soon
+                </button>
               </div>
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <div class="card h-100 border-0 bg-light">
               <div class="card-body text-center">
-                <i class="bi bi-person-gear text-primary mb-3" style="font-size: 2rem;" aria-hidden="true"></i>
-                <h6 class="card-title">Profile Settings</h6>
-                <p class="card-text text-muted small">Update your preferences and information</p>
+                <i class="bi bi-star text-primary mb-3" style="font-size: 2rem;" aria-hidden="true"></i>
+                <h6 class="card-title">Reviews</h6>
+                <p class="card-text text-muted small">Rate and review programs you've joined</p>
+                <button class="btn btn-outline-primary btn-sm" disabled>
+                  Coming Soon
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card h-100 border-0 bg-light">
+              <div class="card-body text-center">
+                <i class="bi bi-bell text-primary mb-3" style="font-size: 2rem;" aria-hidden="true"></i>
+                <h6 class="card-title">Notifications</h6>
+                <p class="card-text text-muted small">Program updates and reminders</p>
+                <button class="btn btn-outline-primary btn-sm" disabled>
+                  Coming Soon
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-if="!hasOrganizerRole" class="col-md-3">
+            <div class="card h-100 border-0 bg-success text-white">
+              <div class="card-body text-center">
+                <i class="bi bi-people text-white mb-3" style="font-size: 2rem;" aria-hidden="true"></i>
+                <h6 class="card-title">Become Organizer</h6>
+                <p class="card-text small">Create and manage sports programs</p>
+                <RouterLink :to="{ name: 'register' }" class="btn btn-light btn-sm">
+                  Add Organizer Role
+                </RouterLink>
               </div>
             </div>
           </div>
@@ -76,15 +111,43 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import authService from '../../services/AuthService.js';
+import MyAccount from '../MyAccount.vue';
+import RoleSwitcher from '../RoleSwitcher.vue';
 
 const router = useRouter();
 
-// Get current user info
-const currentUser = computed(() => authService.getCurrentUser());
-const userEmail = computed(() => currentUser.value.user?.email || 'Member');
+// Check if user has organizer role
+const currentUser = ref({ user: null, role: null, availableRoles: [] });
+const hasOrganizerRole = computed(() => {
+  const availableRoles = currentUser.value.availableRoles || [];
+  return availableRoles.includes('organizer');
+});
+
+// Load user data on mount
+onMounted(async () => {
+  const userData = await authService.getCurrentUser();
+  currentUser.value = userData;
+});
+
+// Listen for auth state changes
+const unsubscribe = authService.onAuthStateChange(async (user, role) => {
+  if (user) {
+    const userData = await authService.getCurrentUser();
+    currentUser.value = userData;
+  } else {
+    currentUser.value = { user: null, role: null, availableRoles: [] };
+  }
+});
+
+// Cleanup on unmount
+onUnmounted(() => {
+  if (unsubscribe) {
+    unsubscribe();
+  }
+});
 
 // Handle logout
 async function handleLogout() {

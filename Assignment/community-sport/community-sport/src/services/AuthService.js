@@ -5,7 +5,15 @@ import {
   onAuthStateChanged,
   getIdTokenResult
 } from 'firebase/auth';
-import { auth } from '../firebase.js';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc,
+  arrayUnion,
+  arrayRemove
+} from 'firebase/firestore';
+import { auth, db } from '../firebase.js';
 
 class AuthService {
   constructor() {
@@ -19,18 +27,20 @@ class AuthService {
       
       if (user) {
         try {
-          // Try to get role from localStorage first (temporary solution)
-          const storedRoleData = localStorage.getItem(`userRole_${user.uid}`);
-          if (storedRoleData) {
-            const roleData = JSON.parse(storedRoleData);
-            this.currentRole = roleData.role;
+          // Get role from Firestore
+          const userDoc = await getDoc(doc(db, 'user-information', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Use last login role or default to first available role
+            this.currentRole = userData.lastLoginRole || 
+                             (userData.roles && userData.roles[0]) || 
+                             userData.role || null;
           } else {
-            // Fallback to checking custom claims (for future Cloud Functions implementation)
-            const tokenResult = await getIdTokenResult(user);
-            this.currentRole = tokenResult.claims.role || null;
+            // No user document found
+            this.currentRole = null;
           }
         } catch (error) {
-          console.error('Error getting user role:', error);
+          console.error('Error getting user role from Firestore:', error);
           this.currentRole = null;
         }
       } else {
@@ -44,56 +54,145 @@ class AuthService {
     });
   }
 
-  // Register a new user with role
+  // Register a new user with role (supports multiple roles)
   async register(email, password, role) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
       
-      // For now, store role in localStorage (temporary solution)
-      // In production, this should be done via Cloud Functions
-      const userRoleData = {
-        uid: userCredential.user.uid,
-        role: role,
-        email: email
-      };
+      // Check if user document already exists in Firestore
+      const userDocRef = doc(db, 'user-information', user.uid);
+      const userDoc = await getDoc(userDocRef);
       
-      localStorage.setItem(`userRole_${userCredential.user.uid}`, JSON.stringify(userRoleData));
+      let userRoles = [];
+      
+      if (userDoc.exists()) {
+        // User document exists, get existing roles
+        const userData = userDoc.data();
+        userRoles = userData.roles || (userData.role ? [userData.role] : []);
+        
+        // Add new role if not already present
+        if (!userRoles.includes(role)) {
+          userRoles.push(role);
+          
+          // Update existing document with new role
+          await updateDoc(userDocRef, {
+            roles: userRoles,
+            lastLoginRole: role,
+            lastUpdated: new Date().toISOString()
+          });
+        } else {
+          // Role already exists, just update last login role
+          await updateDoc(userDocRef, {
+            lastLoginRole: role,
+            lastUpdated: new Date().toISOString()
+          });
+        }
+      } else {
+        // Create new user document
+        userRoles = [role];
+        const userRoleData = {
+          uid: user.uid,
+          email: email,
+          roles: userRoles,
+          role: role, // Keep for backward compatibility
+          lastLoginRole: role,
+          createdAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString()
+        };
+        
+        await setDoc(userDocRef, userRoleData);
+        console.log('User document created successfully:', userRoleData);
+      }
+      
+      // Set current role immediately for the auth state listener
       this.currentRole = role;
       
       return {
-        user: userCredential.user,
-        role: role
+        user: user,
+        role: role,
+        availableRoles: userRoles
       };
     } catch (error) {
+      console.error('Registration error:', error);
       throw new Error(this.getErrorMessage(error));
     }
   }
 
-  // Login user with role validation
+  // Login user with role validation (supports multiple roles)
   async login(email, password, expectedRole) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
       
-      // Get role from localStorage (temporary solution)
-      const storedRoleData = localStorage.getItem(`userRole_${userCredential.user.uid}`);
+      // Get user document from Firestore
+      const userDocRef = doc(db, 'user-information', user.uid);
+      const userDoc = await getDoc(userDocRef);
       
-      if (!storedRoleData) {
-        throw new Error('No role found on account. Please register again or contact support.');
+      if (!userDoc.exists()) {
+        // User exists in Auth but not in Firestore
+        console.warn('User exists in Auth but not in Firestore. Creating user document...');
+        try {
+          const defaultUserData = {
+            uid: user.uid,
+            email: user.email,
+            roles: [expectedRole],
+            role: expectedRole, // Keep for backward compatibility
+            lastLoginRole: expectedRole,
+            createdAt: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            recoveredFromAuth: true // Flag to indicate this was recovered
+          };
+          
+          await setDoc(userDocRef, defaultUserData);
+          console.log(' User document created during login recovery');
+          this.currentRole = expectedRole;
+          
+          return {
+            user: user,
+            role: expectedRole,
+            availableRoles: [expectedRole]
+          };
+        } catch (firestoreError) {
+          console.error(' Failed to create user document during login:', firestoreError);
+          throw new Error('Unable to create user profile. Please check Firestore permissions or try registering again.');
+        }
       }
       
-      const roleData = JSON.parse(storedRoleData);
-      const userRole = roleData.role;
+      const userData = userDoc.data();
+      
+      // Handle both old single role format and new multiple roles format
+      let userRoles = [];
+      if (userData.roles && Array.isArray(userData.roles)) {
+        userRoles = userData.roles;
+      } else if (userData.role) {
+        userRoles = [userData.role];
+        // Upgrade old format to new format
+        await updateDoc(userDocRef, {
+          roles: userRoles,
+          lastUpdated: new Date().toISOString()
+        });
+      }
       
       // Check if user has the expected role
-      if (!this.hasRole(userRole, expectedRole)) {
-        throw new Error(`This account does not have ${expectedRole} access. Please use the correct login portal.`);
+      if (!this.hasRole(userRoles, expectedRole)) {
+        const availableRoles = userRoles.join(', ');
+        throw new Error(`This account does not have ${expectedRole} access. Available roles: ${availableRoles}. Please use the correct login portal or register for this role.`);
       }
       
-      this.currentRole = expectedRole; // Set the role they're logging in as
+      // Update last login role
+      await updateDoc(userDocRef, {
+        lastLoginRole: expectedRole,
+        lastLoginAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      });
+      
+      this.currentRole = expectedRole;
       
       return {
-        user: userCredential.user,
-        role: expectedRole
+        user: user,
+        role: expectedRole,
+        availableRoles: userRoles
       };
     } catch (error) {
       throw new Error(this.getErrorMessage(error));
@@ -111,13 +210,12 @@ class AuthService {
     return false;
   }
 
-  // Logout user
+  // Logout user (preserve role data for future logins)
+  // Don't clear role data from localStorage - preserve for future logins
+  // Only clear current session data
   async logout() {
     try {
-      // Clear role data from localStorage
-      if (this.currentUser) {
-        localStorage.removeItem(`userRole_${this.currentUser.uid}`);
-      }
+      
       
       await signOut(auth);
       this.currentUser = null;
@@ -127,11 +225,35 @@ class AuthService {
     }
   }
 
-  // Get current user info
-  getCurrentUser() {
+  // Get current user info with available roles
+  async getCurrentUser() {
+    let availableRoles = [];
+    if (this.currentUser) {
+      try {
+        const userDoc = await getDoc(doc(db, 'user-information', this.currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          availableRoles = userData.roles || (userData.role ? [userData.role] : []);
+        }
+      } catch (error) {
+        console.error('Error getting user roles from Firestore:', error);
+        availableRoles = [];
+      }
+    }
+    
     return {
       user: this.currentUser,
-      role: this.currentRole
+      role: this.currentRole,
+      availableRoles: availableRoles
+    };
+  }
+
+  // Get current user info synchronously
+  getCurrentUserSync() {
+    return {
+      user: this.currentUser,
+      role: this.currentRole,
+      availableRoles: [] 
     };
   }
 
@@ -145,7 +267,72 @@ class AuthService {
     return this.currentRole === role;
   }
 
-  // Add auth state listener
+  // switch user's current role , if they have multiple roles
+  async switchRole(newRole) {
+    if (this.currentUser) {
+      try {
+        const userDocRef = doc(db, 'user-information', this.currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const userRoles = userData.roles || (userData.role ? [userData.role] : []);
+          
+          if (userRoles.includes(newRole)) {
+            this.currentRole = newRole;
+            
+            // Update last login role in Firestore
+            await updateDoc(userDocRef, {
+              lastLoginRole: newRole,
+              lastRoleSwitchAt: new Date().toISOString(),
+              lastUpdated: new Date().toISOString()
+            });
+            
+            // Notify all listeners of the role change
+            this.authStateListeners.forEach(callback => {
+              callback(this.currentUser, this.currentRole);
+            });
+            
+            return true;
+          }
+        }
+      } catch (error) {
+        console.error('Error switching role:', error);
+      }
+    }
+    return false;
+  }
+
+  // Add a new role to existing user
+  async addRoleToUser(newRole) {
+    if (this.currentUser) {
+      try {
+        const userDocRef = doc(db, 'user-information', this.currentUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          let userRoles = userData.roles || (userData.role ? [userData.role] : []);
+          
+          if (!userRoles.includes(newRole)) {
+            userRoles.push(newRole);
+            
+            await updateDoc(userDocRef, {
+              roles: userRoles,
+              lastUpdated: new Date().toISOString()
+            });
+            
+            return true;
+          }
+        }
+      } catch (error) {
+        console.error('Error adding role to user:', error);
+      }
+    }
+    return false;
+  }
+
+  //auth state listener
   onAuthStateChange(callback) {
     this.authStateListeners.push(callback);
     
@@ -170,10 +357,18 @@ class AuthService {
         return 'Please enter a valid email address.';
       case 'auth/too-many-requests':
         return 'Too many failed attempts. Please try again later.';
+      case 'permission-denied':
+        return 'Permission denied. Please check your Firestore security rules or contact support.';
+      case 'unavailable':
+        return 'Service temporarily unavailable. Please try again later.';
+      case 'failed-precondition':
+        return 'Database operation failed. Please try again.';
       default:
+        console.error('Full error details:', error);
         return error.message || 'An error occurred. Please try again.';
     }
   }
+
 }
 
 // Create singleton instance

@@ -26,6 +26,14 @@ const routes = [
     meta: { requiresAuth: true, requiresRole: 'organizer' }
   },
   
+  // Organizer-specific routes
+  { 
+    path: '/launch-program', 
+    name: 'launch-program', 
+    component: () => import('../components/pages/LaunchProgramPage.vue'),
+    meta: { requiresAuth: true, requiresRole: 'organizer' }
+  },
+  
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ];
 

@@ -16,6 +16,12 @@
               {{ successMessage }}
             </div>
 
+            <!-- Info Message for Existing Users -->
+            <div v-if="isExistingUser" class="alert alert-info" role="alert">
+              <i class="bi bi-info-circle-fill me-2" aria-hidden="true"></i>
+              You're already registered! You can add {{ form.role }} role to your existing account.
+            </div>
+
             <!-- Error Message -->
             <div v-if="errorMessage" class="alert alert-danger" role="alert">
               <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
@@ -163,7 +169,7 @@
                 :disabled="isSubmitting || !isFormValid"
               >
                 <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                {{ isSubmitting ? 'Creating Account...' : 'Create Account' }}
+                {{ isSubmitting ? (isExistingUser ? 'Adding Role...' : 'Creating Account...') : (isExistingUser ? `Add ${form.role} Role` : 'Create Account') }}
               </button>
 
               <!-- Login Link -->
@@ -213,6 +219,7 @@ const isSubmitting = ref(false);
 const showPassword = ref(false);
 const successMessage = ref('');
 const errorMessage = ref('');
+const isExistingUser = ref(false);
 
 // Form refs for focus management
 const emailRef = ref(null);
@@ -327,7 +334,12 @@ async function handleRegister() {
       form.role
     );
 
-    successMessage.value = `Account created successfully! Welcome to Community Sport as a ${form.role}.`;
+    if (result.availableRoles && result.availableRoles.length > 1) {
+      successMessage.value = `${form.role} role added successfully! You now have access to both member and organizer features.`;
+      isExistingUser.value = true;
+    } else {
+      successMessage.value = `Account created successfully! Welcome to Community Sport as a ${form.role}.`;
+    }
 
     // Redirect to appropriate account page after short delay
     setTimeout(() => {
@@ -336,7 +348,12 @@ async function handleRegister() {
     }, 2000);
 
   } catch (error) {
-    errorMessage.value = error.message;
+    // Check if this is an existing user trying to add a role
+    if (error.message.includes('email-already-in-use')) {
+      errorMessage.value = 'This email is already registered. Please sign in first, then you can add additional roles from your account page.';
+    } else {
+      errorMessage.value = error.message;
+    }
     console.error('Registration error:', error);
   } finally {
     isSubmitting.value = false;
