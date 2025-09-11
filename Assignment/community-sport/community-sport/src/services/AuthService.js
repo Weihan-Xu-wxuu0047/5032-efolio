@@ -55,7 +55,7 @@ class AuthService {
   }
 
   // Register a new user with role (supports multiple roles)
-  async register(email, password, role) {
+  async register(userName, email, password, role) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -77,13 +77,15 @@ class AuthService {
           
           // Update existing document with new role
           await updateDoc(userDocRef, {
+            userName: userName, // Update userName if provided
             roles: userRoles,
             lastLoginRole: role,
             lastUpdated: new Date().toISOString()
           });
         } else {
-          // Role already exists, just update last login role
+          // Role already exists, just update last login role and userName
           await updateDoc(userDocRef, {
+            userName: userName, // Update userName if provided
             lastLoginRole: role,
             lastUpdated: new Date().toISOString()
           });
@@ -93,6 +95,7 @@ class AuthService {
         userRoles = [role];
         const userRoleData = {
           uid: user.uid,
+          userName: userName,
           email: email,
           roles: userRoles,
           role: role, // Keep for backward compatibility
@@ -133,16 +136,17 @@ class AuthService {
         // User exists in Auth but not in Firestore
         console.warn('User exists in Auth but not in Firestore. Creating user document...');
         try {
-          const defaultUserData = {
-            uid: user.uid,
-            email: user.email,
-            roles: [expectedRole],
-            role: expectedRole, // Keep for backward compatibility
-            lastLoginRole: expectedRole,
-            createdAt: new Date().toISOString(),
-            lastUpdated: new Date().toISOString(),
-            recoveredFromAuth: true // Flag to indicate this was recovered
-          };
+        const defaultUserData = {
+          uid: user.uid,
+          userName: user.email.split('@')[0], // Default userName from email
+          email: user.email,
+          roles: [expectedRole],
+          role: expectedRole, // Keep for backward compatibility
+          lastLoginRole: expectedRole,
+          createdAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          recoveredFromAuth: true // Flag to indicate this was recovered
+        };
           
           await setDoc(userDocRef, defaultUserData);
           console.log(' User document created during login recovery');
@@ -228,12 +232,14 @@ class AuthService {
   // Get current user info with available roles
   async getCurrentUser() {
     let availableRoles = [];
+    let userName = null;
     if (this.currentUser) {
       try {
         const userDoc = await getDoc(doc(db, 'user-information', this.currentUser.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
           availableRoles = userData.roles || (userData.role ? [userData.role] : []);
+          userName = userData.userName || null;
         }
       } catch (error) {
         console.error('Error getting user roles from Firestore:', error);
@@ -244,7 +250,8 @@ class AuthService {
     return {
       user: this.currentUser,
       role: this.currentRole,
-      availableRoles: availableRoles
+      availableRoles: availableRoles,
+      userName: userName
     };
   }
 

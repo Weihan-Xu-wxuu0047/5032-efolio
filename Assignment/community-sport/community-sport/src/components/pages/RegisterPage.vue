@@ -71,6 +71,35 @@
                 </div>
               </div>
 
+              <!-- User Name -->
+              <div class="mb-3">
+                <label for="userName" class="form-label">
+                  User Name <span class="text-danger">*</span>
+                </label>
+                <input
+                  id="userName"
+                  ref="userNameRef"
+                  type="text"
+                  class="form-control"
+                  :class="{ 'is-invalid': touched.userName && errors.userName }"
+                  v-model.trim="form.userName"
+                  @blur="onBlur('userName')"
+                  @input="onInput('userName')"
+                  aria-required="true"
+                  :aria-invalid="touched.userName && !!errors.userName"
+                  :aria-describedby="touched.userName && errors.userName ? 'userName-error' : undefined"
+                  placeholder="Enter your user name"
+                  autocomplete="username"
+                  required
+                />
+                <div v-if="touched.userName && errors.userName" id="userName-error" class="invalid-feedback">
+                  {{ errors.userName }}
+                </div>
+                <div class="form-text">
+                  This will be displayed as your profile name
+                </div>
+              </div>
+
               <!-- Email -->
               <div class="mb-3">
                 <label for="email" class="form-label">
@@ -197,6 +226,7 @@ const router = useRouter();
 // Form data
 const form = reactive({
   role: 'member',
+  userName: '',
   email: '',
   password: '',
   confirmPassword: ''
@@ -204,12 +234,14 @@ const form = reactive({
 
 // Form state
 const touched = reactive({
+  userName: false,
   email: false,
   password: false,
   confirmPassword: false
 });
 
 const errors = reactive({
+  userName: '',
   email: '',
   password: '',
   confirmPassword: ''
@@ -222,6 +254,7 @@ const errorMessage = ref('');
 const isExistingUser = ref(false);
 
 // Form refs for focus management
+const userNameRef = ref(null);
 const emailRef = ref(null);
 const passwordRef = ref(null);
 const confirmPasswordRef = ref(null);
@@ -235,6 +268,18 @@ function validateField(fieldName) {
   let error = '';
 
   switch (fieldName) {
+    case 'userName':
+      if (!value) {
+        error = 'User name is required.';
+      } else if (value.length < 2) {
+        error = 'User name must be at least 2 characters long.';
+      } else if (value.length > 30) {
+        error = 'User name must be less than 30 characters.';
+      } else if (!/^[a-zA-Z0-9\s_-]+$/.test(value)) {
+        error = 'User name can only contain letters, numbers, spaces, underscores, and hyphens.';
+      }
+      break;
+
     case 'email':
       if (!value) {
         error = 'Email is required.';
@@ -265,19 +310,22 @@ function validateField(fieldName) {
 }
 
 function validateAll() {
+  const userNameValid = validateField('userName');
   const emailValid = validateField('email');
   const passwordValid = validateField('password');
   const confirmPasswordValid = validateField('confirmPassword');
   
-  return emailValid && passwordValid && confirmPasswordValid;
+  return userNameValid && emailValid && passwordValid && confirmPasswordValid;
 }
 
 // Computed properties
 const isFormValid = computed(() => {
   return form.role && 
+         form.userName &&
          form.email && 
          form.password && 
          form.confirmPassword &&
+         !errors.userName &&
          !errors.email && 
          !errors.password && 
          !errors.confirmPassword;
@@ -302,6 +350,7 @@ function onInput(fieldName) {
 async function focusFirstError() {
   await nextTick();
   const fieldOrder = [
+    { name: 'userName', ref: userNameRef },
     { name: 'email', ref: emailRef },
     { name: 'password', ref: passwordRef },
     { name: 'confirmPassword', ref: confirmPasswordRef }
@@ -329,6 +378,7 @@ async function handleRegister() {
 
   try {
     const result = await authService.register(
+      form.userName,
       form.email,
       form.password,
       form.role

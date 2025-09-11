@@ -26,6 +26,14 @@ const routes = [
     meta: { requiresAuth: true, requiresRole: 'organizer' }
   },
   
+  // Member-specific routes
+  { 
+    path: '/member-appointment', 
+    name: 'member-appointment', 
+    component: () => import('../components/pages/MemberAppointmentPage.vue'),
+    meta: { requiresAuth: true, requiresRole: 'member' }
+  },
+
   // Organizer-specific routes
   { 
     path: '/launch-program', 

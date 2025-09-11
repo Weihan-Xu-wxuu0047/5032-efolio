@@ -67,7 +67,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import authService from '../services/AuthService.js';
 
 // Get current user info
-const currentUser = ref({ user: null, role: null, availableRoles: [] });
+const currentUser = ref({ user: null, role: null, availableRoles: [], userName: null });
 
 // Reactive user info
 const userEmail = computed(() => currentUser.value.user?.email || 'No email');
@@ -86,7 +86,7 @@ const unsubscribe = authService.onAuthStateChange(async (user, role) => {
     const userData = await authService.getCurrentUser();
     currentUser.value = userData;
   } else {
-    currentUser.value = { user: null, role: null, availableRoles: [] };
+    currentUser.value = { user: null, role: null, availableRoles: [], userName: null };
   }
 });
 
@@ -97,8 +97,13 @@ onUnmounted(() => {
   }
 });
 
-// Extract display name from email (before @ symbol)
+// Extract display name from userName or fallback to email
 const displayName = computed(() => {
+  // First try to get userName from Firestore data
+  if (currentUser.value.userName) {
+    return currentUser.value.userName;
+  }
+  // Fallback to email-based name if no userName
   if (currentUser.value.user?.email) {
     return currentUser.value.user.email.split('@')[0];
   }
