@@ -3,13 +3,19 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 
+// Debug: Log environment variables (remove in production)
+console.log('Firebase Environment Variables:');
+console.log('API Key:', import.meta.env.VITE_FIREBASE_API_KEY ? 'Loaded' : 'Missing');
+console.log('Auth Domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
+console.log('Project ID:', import.meta.env.VITE_FIREBASE_PROJECT_ID);
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDCz8UYFPq8z2DfHi2mJ26y1QrBCgFTbSU",
-  authDomain: "assingment1-community-sport.firebaseapp.com",
-  projectId: "assingment1-community-sport",
-  storageBucket: "assingment1-community-sport.firebasestorage.app",
-  messagingSenderId: "716321854345",
-  appId: "1:716321854345:web:da05e36411e3605593c758"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase

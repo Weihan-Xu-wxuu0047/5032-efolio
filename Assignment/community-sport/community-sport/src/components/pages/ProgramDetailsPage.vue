@@ -162,7 +162,7 @@
                 </button>
               </div>
 
-              <div v-else>
+    <div v-else>
                 <div v-for="comment in comments" :key="comment.id" class="comment-item border-bottom pb-3 mb-3">
                   <div class="d-flex justify-content-between align-items-start mb-2">
                     <div class="d-flex align-items-center gap-2">

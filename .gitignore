@@ -1,1 +1,13 @@
 /Assignment/community-sport/notes
+
+/Assignment/community-sport/community-sport/functions/node_modules/*
+!/Assignment/community-sport/community-sport/functions/node_modules/
+!/Assignment/community-sport/community-sport/functions/node_modules/package.json
+!/Assignment/community-sport/community-sport/functions/node_modules/package-lock.json
+/Assignment/community-sport/community-sport/node_modules/*
+!/Assignment/community-sport/community-sport/node_modules/
+!/Assignment/community-sport/community-sport/node_modules/.package-lock.json
+
+/Assignment/community-sport/node_modules/*
+!/Assignment/community-sport/node_modules/
+!/Assignment/community-sport/node_modules/.package-lock.json

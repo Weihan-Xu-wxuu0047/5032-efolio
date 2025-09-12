@@ -1,35 +1,29 @@
-# community-sport
+# Community Sport Platform
 
+## 🚀 Quick Start
 
+### 1. Install Dependencies
 
-## Recommended IDE Setup
-
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+#### 1.1 Install firebase dependencies
 
 ```sh
+cd community-sport
+npm install
+
+```
+
+1.2 Install Vue project dependencies
+
+```sh
+cd community-sport/community-sport
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+
+
+### 2. Start Development Server
 
 ```sh
 npm run dev
 ```
 
-### Compile and Minify for Production
-
-```sh
-npm run build
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
