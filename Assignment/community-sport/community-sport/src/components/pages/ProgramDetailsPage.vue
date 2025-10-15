@@ -340,10 +340,10 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { doc, collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import authService from '../../services/AuthService.js';
-import programs from '../../assets/data/programs.json';
+import dataService from '../../services/DataService.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -611,9 +611,14 @@ async function handleBooking() {
 
 // Lifecycle
 onMounted(async () => {
-  program.value = programs.find(p => String(p.id) === String(route.params.id)) || null;
-  if (program.value) {
-    await loadComments();
+  try {
+    program.value = await dataService.getProgram(route.params.id);
+    if (program.value) {
+      await loadComments();
+    }
+  } catch (error) {
+    console.error('Error loading program:', error);
+    program.value = null;
   }
 });
 </script>

@@ -1,9 +1,27 @@
 <script setup>
+import { ref, onMounted } from 'vue';
 import FaqAccordion from '../FaqAccordion.vue';
 import ContactForm from '../ContactForm.vue';
+import dataService from '../../services/DataService.js';
 
-// Load local dynamic data
-import faqs from '../../assets/data/faqs.json';
+// State
+const faqs = ref([]);
+const loading = ref(true);
+const error = ref(null);
+
+// Load FAQs on mount
+onMounted(async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+    faqs.value = await dataService.getFaqs();
+  } catch (err) {
+    console.error('Error loading FAQs:', err);
+    error.value = 'Failed to load FAQs. Please try again later.';
+  } finally {
+    loading.value = false;
+  }
+});
 </script>
 
 <template>
@@ -17,7 +35,29 @@ import faqs from '../../assets/data/faqs.json';
       <div class="col-12 col-lg-6">
         <section aria-labelledby="faq-heading">
           <h2 id="faq-heading" class="h5 mb-3">Frequently Asked Questions</h2>
-          <FaqAccordion :items="faqs" />
+          
+          <!-- Loading State -->
+          <div v-if="loading" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading FAQs...</span>
+            </div>
+            <p class="mt-2 mb-0 text-muted">Loading FAQs...</p>
+          </div>
+
+          <!-- Error State -->
+          <div v-else-if="error" class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
+            {{ error }}
+          </div>
+
+          <!-- FAQs -->
+          <div v-else>
+            <FaqAccordion :items="faqs" />
+            <div v-if="faqs.length === 0" class="text-center text-muted py-4">
+              <i class="bi bi-question-circle" aria-hidden="true"></i>
+              <p class="mt-2 mb-0">No FAQs available at the moment.</p>
+            </div>
+          </div>
         </section>
       </div>
 

@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, computed, watch } from 'vue';
+import { reactive, watch, ref, onMounted } from 'vue';
+import dataService from '../services/DataService.js';
 
 const props = defineProps({
   initialQuery: { type: String, default: '' }
@@ -16,6 +17,12 @@ const filters = reactive({
   accessibility: []
 });
 
+// Filter options state
+const sportOptions = ref([]);
+const ageGroupOptions = ref([]);
+const accessibilityOptions = ref([]);
+const optionsLoading = ref(true);
+
 // Watch for changes to initialQuery prop and update filters
 watch(() => props.initialQuery, (newQuery) => {
   if (newQuery && newQuery !== filters.query) {
@@ -23,17 +30,36 @@ watch(() => props.initialQuery, (newQuery) => {
   }
 }, { immediate: true });
 
-// Available filter options (derived from programs.json structure)
-const sportOptions = ['Basketball', 'Yoga', 'Running', 'Swimming'];
-const ageGroupOptions = ['8-12', '12-17', '18-40', '40-60', '60+'];
-const accessibilityOptions = [
-  { value: 'wheelchair-access', label: 'Wheelchair accessible' },
-  { value: 'accessible-toilets', label: 'Accessible toilets' },
-  { value: 'pool-lift', label: 'Pool lift' },
-  { value: 'family-change-rooms', label: 'Family change rooms' },
-  { value: 'quiet-area', label: 'Quiet area' },
-  { value: 'pet-friendly', label: 'Pet friendly' }
-];
+// Load filter options from Firestore
+onMounted(async () => {
+  try {
+    optionsLoading.value = true;
+    const [sports, ageGroups, accessibility] = await Promise.all([
+      dataService.getSportOptions(),
+      dataService.getAgeGroupOptions(),
+      dataService.getAccessibilityOptions()
+    ]);
+    
+    sportOptions.value = sports;
+    ageGroupOptions.value = ageGroups;
+    accessibilityOptions.value = accessibility;
+  } catch (error) {
+    console.error('Error loading filter options:', error);
+    // Fallback to default options
+    sportOptions.value = ['Basketball', 'Yoga', 'Running', 'Swimming'];
+    ageGroupOptions.value = ['8-12', '12-17', '18-40', '40-60', '60+'];
+    accessibilityOptions.value = [
+      { value: 'wheelchair-access', label: 'Wheelchair accessible' },
+      { value: 'accessible-toilets', label: 'Accessible toilets' },
+      { value: 'pool-lift', label: 'Pool lift' },
+      { value: 'family-change-rooms', label: 'Family change rooms' },
+      { value: 'quiet-area', label: 'Quiet area' },
+      { value: 'pet-friendly', label: 'Pet friendly' }
+    ];
+  } finally {
+    optionsLoading.value = false;
+  }
+});
 
 // Validation errors
 const errors = reactive({
@@ -65,12 +91,12 @@ function validateGeneral() {
   return true;
 }
 
-// Computed validation state
-const isValid = computed(() => {
-  return !errors.maxCost && !errors.general && 
-         (filters.query.trim() || filters.sport || filters.ageGroup || 
-          String(filters.maxCost || '').trim() || filters.accessibility.length > 0);
-});
+// Computed validation state (currently unused but kept for future use)
+// const isValid = computed(() => {
+//   return !errors.maxCost && !errors.general && 
+//          (filters.query.trim() || filters.sport || filters.ageGroup || 
+//           String(filters.maxCost || '').trim() || filters.accessibility.length > 0);
+// });
 
 // Watch for changes and emit to parent
 watch(() => ({ ...filters }), () => {

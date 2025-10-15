@@ -136,31 +136,122 @@
                   </div>
 
                   <!-- Cost -->
-                  <div class="mb-3">
-                    <label for="cost" class="form-label">
-                      Cost <span class="text-danger">*</span>
-                    </label>
-                    <div class="input-group">
-                      <span class="input-group-text">$</span>
-                      <input
-                        id="cost"
-                        ref="costRef"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        class="form-control"
-                        :class="{ 'is-invalid': touched.cost && errors.cost }"
-                        v-model.number="form.cost"
-                        @blur="onBlur('cost')"
-                        @input="onInput('cost')"
-                        placeholder="0.00"
+                  <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                      <label for="cost" class="form-label">
+                        Cost <span class="text-danger">*</span>
+                      </label>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input
+                          id="cost"
+                          ref="costRef"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          class="form-control"
+                          :class="{ 'is-invalid': touched.cost && errors.cost }"
+                          v-model.number="form.cost"
+                          @blur="onBlur('cost')"
+                          @input="onInput('cost')"
+                          placeholder="0.00"
+                          required
+                        />
+                      </div>
+                      <div v-if="touched.cost && errors.cost" class="invalid-feedback">
+                        {{ errors.cost }}
+                      </div>
+                      <div class="form-text">Enter 0 for free programs</div>
+                    </div>
+                    <div class="col-md-6">
+                      <label for="cost-unit" class="form-label">
+                        Cost Unit <span class="text-danger">*</span>
+                      </label>
+                      <select
+                        id="cost-unit"
+                        class="form-select"
+                        :class="{ 'is-invalid': touched.costUnit && errors.costUnit }"
+                        v-model="form.costUnit"
+                        @blur="onBlur('costUnit')"
+                        @change="onInput('costUnit')"
                         required
-                      />
+                      >
+                        <option v-for="unit in costUnitOptions" :key="unit" :value="unit">
+                          {{ unit }}
+                        </option>
+                      </select>
+                      <div v-if="touched.costUnit && errors.costUnit" class="invalid-feedback">
+                        {{ errors.costUnit }}
+                      </div>
                     </div>
-                    <div v-if="touched.cost && errors.cost" class="invalid-feedback">
-                      {{ errors.cost }}
+                  </div>
+
+                  <!-- Image Upload -->
+                  <div class="mb-3">
+                    <label for="program-images" class="form-label">
+                      Program Images
+                    </label>
+                    <input
+                      id="program-images"
+                      type="file"
+                      class="form-control"
+                      :class="{ 'is-invalid': touched.images && errors.images }"
+                      multiple
+                      accept="image/*"
+                      @change="handleImageUpload"
+                      @blur="onBlur('images')"
+                    />
+                    <div v-if="touched.images && errors.images" class="invalid-feedback">
+                      {{ errors.images }}
                     </div>
-                    <div class="form-text">Enter 0 for free programs</div>
+                    <div class="form-text">Upload images to showcase your program (JPG, PNG, GIF - Max 5MB each, up to 10 images)</div>
+                    
+                    <!-- Image Preview -->
+                    <div v-if="imagePreviewUrls.length > 0" class="mt-3">
+                      <div class="row g-2">
+                        <div 
+                          v-for="(preview, index) in imagePreviewUrls" 
+                          :key="index" 
+                          class="col-6 col-md-4 col-lg-3"
+                        >
+                          <div class="position-relative">
+                            <img 
+                              :src="preview.url" 
+                              :alt="`Preview ${index + 1}`"
+                              class="img-thumbnail w-100"
+                              style="height: 100px; object-fit: cover;"
+                            />
+                            <button
+                              type="button"
+                              class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1"
+                              @click="removeImage(index)"
+                              :aria-label="`Remove image ${index + 1}`"
+                            >
+                              <i class="bi bi-x" aria-hidden="true"></i>
+                            </button>
+                            <div class="small text-muted mt-1 text-truncate">
+                              {{ preview.name }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Upload Status -->
+                    <div v-if="imageUploadStatus" class="mt-2">
+                      <div v-if="imageUploadStatus.type === 'uploading'" class="text-info">
+                        <i class="bi bi-cloud-arrow-up me-1" aria-hidden="true"></i>
+                        Uploading images...
+                      </div>
+                      <div v-else-if="imageUploadStatus.type === 'success'" class="text-success">
+                        <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+                        {{ imageUploadStatus.message }}
+                      </div>
+                      <div v-else-if="imageUploadStatus.type === 'error'" class="text-danger">
+                        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                        {{ imageUploadStatus.message }}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -232,6 +323,207 @@
                       </span>
                     </div>
                     <div class="form-text">Examples: beginner-friendly, women-only, LGBTQ+ friendly, family-oriented</div>
+                  </div>
+
+                  <!-- Equipment -->
+                  <div class="mb-3">
+                    <label class="form-label">Equipment</label>
+                    <div class="form-check mb-2">
+                      <input
+                        id="equipment-provided"
+                        type="checkbox"
+                        class="form-check-input"
+                        v-model="form.equipment.provided"
+                      />
+                      <label for="equipment-provided" class="form-check-label">
+                        Equipment provided by organizer
+                      </label>
+                    </div>
+                    
+                    <label for="equipment-input" class="form-label">Required Equipment</label>
+                    <div class="input-group mb-2">
+                      <input
+                        id="equipment-input"
+                        type="text"
+                        class="form-control"
+                        v-model="newEquipmentItem"
+                        @keyup.enter="addEquipmentItem"
+                        placeholder="Type equipment item and press Enter"
+                      />
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        @click="addEquipmentItem"
+                        :disabled="!newEquipmentItem.trim()"
+                      >
+                        Add Item
+                      </button>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                      <span
+                        v-for="(item, index) in form.equipment.required"
+                        :key="index"
+                        class="badge bg-secondary"
+                      >
+                        {{ item }}
+                        <button
+                          type="button"
+                          class="btn-close btn-close-white ms-2"
+                          @click="removeEquipmentItem(index)"
+                          :aria-label="`Remove ${item}`"
+                        ></button>
+                      </span>
+                    </div>
+                    <div class="form-text">Examples: sports shoes, water bottle, yoga mat</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Venue Information -->
+              <div class="card mt-4">
+                <div class="card-header">
+                  <h5 class="card-title mb-0">
+                    <i class="bi bi-geo-alt me-2" aria-hidden="true"></i>
+                    Venue Information
+                  </h5>
+                </div>
+                <div class="card-body">
+                  <!-- Venue Name -->
+                  <div class="mb-3">
+                    <label for="venue-name" class="form-label">
+                      Venue Name <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      id="venue-name"
+                      type="text"
+                      class="form-control"
+                      :class="{ 'is-invalid': touched.venueName && errors.venueName }"
+                      v-model.trim="form.venue.name"
+                      @blur="onBlur('venueName')"
+                      @input="onInput('venueName')"
+                      placeholder="e.g. Carlton Youth Centre"
+                      required
+                    />
+                    <div v-if="touched.venueName && errors.venueName" class="invalid-feedback">
+                      {{ errors.venueName }}
+                    </div>
+                  </div>
+
+                  <!-- Address -->
+                  <div class="mb-3">
+                    <label for="venue-address" class="form-label">
+                      Address <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      id="venue-address"
+                      type="text"
+                      class="form-control"
+                      :class="{ 'is-invalid': touched.venueAddress && errors.venueAddress }"
+                      v-model.trim="form.venue.address"
+                      @blur="onBlur('venueAddress')"
+                      @input="onInput('venueAddress')"
+                      placeholder="e.g. 88 Rathdowne St"
+                      required
+                    />
+                    <div v-if="touched.venueAddress && errors.venueAddress" class="invalid-feedback">
+                      {{ errors.venueAddress }}
+                    </div>
+                  </div>
+
+                  <!-- Suburb and Postcode -->
+                  <div class="row g-3">
+                    <div class="col-md-8">
+                      <label for="venue-suburb" class="form-label">
+                        Suburb <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        id="venue-suburb"
+                        type="text"
+                        class="form-control"
+                        :class="{ 'is-invalid': touched.venueSuburb && errors.venueSuburb }"
+                        v-model.trim="form.venue.suburb"
+                        @blur="onBlur('venueSuburb')"
+                        @input="onInput('venueSuburb')"
+                        placeholder="e.g. Carlton"
+                        required
+                      />
+                      <div v-if="touched.venueSuburb && errors.venueSuburb" class="invalid-feedback">
+                        {{ errors.venueSuburb }}
+                      </div>
+                    </div>
+                    <div class="col-md-4">
+                      <label for="venue-postcode" class="form-label">
+                        Postcode <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        id="venue-postcode"
+                        type="text"
+                        class="form-control"
+                        :class="{ 'is-invalid': touched.venuePostcode && errors.venuePostcode }"
+                        v-model.trim="form.venue.postcode"
+                        @blur="onBlur('venuePostcode')"
+                        @input="onInput('venuePostcode')"
+                        placeholder="e.g. 3053"
+                        maxlength="4"
+                        required
+                      />
+                      <div v-if="touched.venuePostcode && errors.venuePostcode" class="invalid-feedback">
+                        {{ errors.venuePostcode }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contact Information -->
+              <div class="card mt-4">
+                <div class="card-header">
+                  <h5 class="card-title mb-0">
+                    <i class="bi bi-telephone me-2" aria-hidden="true"></i>
+                    Contact Information
+                  </h5>
+                </div>
+                <div class="card-body">
+                  <!-- Contact Email -->
+                  <div class="mb-3">
+                    <label for="contact-email" class="form-label">
+                      Contact Email <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      id="contact-email"
+                      type="email"
+                      class="form-control"
+                      :class="{ 'is-invalid': touched.contactEmail && errors.contactEmail }"
+                      v-model.trim="form.contact.email"
+                      @blur="onBlur('contactEmail')"
+                      @input="onInput('contactEmail')"
+                      placeholder="e.g. contact@example.com"
+                      required
+                    />
+                    <div v-if="touched.contactEmail && errors.contactEmail" class="invalid-feedback">
+                      {{ errors.contactEmail }}
+                    </div>
+                  </div>
+
+                  <!-- Contact Phone -->
+                  <div class="mb-3">
+                    <label for="contact-phone" class="form-label">
+                      Contact Phone <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      id="contact-phone"
+                      type="tel"
+                      class="form-control"
+                      :class="{ 'is-invalid': touched.contactPhone && errors.contactPhone }"
+                      v-model.trim="form.contact.phone"
+                      @blur="onBlur('contactPhone')"
+                      @input="onInput('contactPhone')"
+                      placeholder="e.g. 03 9123 4567"
+                      required
+                    />
+                    <div v-if="touched.contactPhone && errors.contactPhone" class="invalid-feedback">
+                      {{ errors.contactPhone }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -349,7 +641,7 @@
                   </div>
 
                   <!-- Start Date -->
-                  <div class="mb-4">
+                  <div class="mb-3">
                     <label for="start-date" class="form-label">
                       Start Date <span class="text-danger">*</span>
                     </label>
@@ -367,6 +659,30 @@
                     <div v-if="touched.startDate && errors.startDate" class="invalid-feedback">
                       {{ errors.startDate }}
                     </div>
+                  </div>
+
+                  <!-- Max Participants -->
+                  <div class="mb-4">
+                    <label for="max-participants" class="form-label">
+                      Max Participants <span class="text-danger">*</span>
+                    </label>
+                    <input
+                      id="max-participants"
+                      type="number"
+                      min="1"
+                      max="1000"
+                      class="form-control"
+                      :class="{ 'is-invalid': touched.maxParticipants && errors.maxParticipants }"
+                      v-model.number="form.maxParticipants"
+                      @blur="onBlur('maxParticipants')"
+                      @input="onInput('maxParticipants')"
+                      placeholder="20"
+                      required
+                    />
+                    <div v-if="touched.maxParticipants && errors.maxParticipants" class="invalid-feedback">
+                      {{ errors.maxParticipants }}
+                    </div>
+                    <div class="form-text">Maximum number of participants allowed</div>
                   </div>
 
                   <!-- Submit Button -->
@@ -390,8 +706,10 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, nextTick } from 'vue';
+import { reactive, ref, computed, nextTick, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import authService from '../../services/AuthService.js';
+import dataService from '../../services/DataService.js';
 
 const router = useRouter();
 
@@ -399,9 +717,11 @@ const router = useRouter();
 const form = reactive({
   title: '',
   sport: '',
+  organizer_email: '',
   ageGroups: [],
   description: '',
   cost: 0,
+  costUnit: 'per-session',
   accessibility: [],
   inclusivityTags: [],
   schedule: {
@@ -411,7 +731,23 @@ const form = reactive({
     endHour: '',
     endMinute: '',
     startDate: ''
-  }
+  },
+  venue: {
+    name: '',
+    address: '',
+    suburb: '',
+    postcode: ''
+  },
+  equipment: {
+    provided: false,
+    required: []
+  },
+  contact: {
+    email: '',
+    phone: ''
+  },
+  images: [], // Not implemented yet
+  maxParticipants: 20
 });
 
 // Form state
@@ -421,10 +757,19 @@ const touched = reactive({
   ageGroups: false,
   description: false,
   cost: false,
+  costUnit: false,
   scheduleDays: false,
   startTime: false,
   endTime: false,
-  startDate: false
+  startDate: false,
+  venueName: false,
+  venueAddress: false,
+  venueSuburb: false,
+  venuePostcode: false,
+  contactEmail: false,
+  contactPhone: false,
+  maxParticipants: false,
+  images: false
 });
 
 const errors = reactive({
@@ -433,16 +778,29 @@ const errors = reactive({
   ageGroups: '',
   description: '',
   cost: '',
+  costUnit: '',
   scheduleDays: '',
   startTime: '',
   endTime: '',
-  startDate: ''
+  startDate: '',
+  venueName: '',
+  venueAddress: '',
+  venueSuburb: '',
+  venuePostcode: '',
+  contactEmail: '',
+  contactPhone: '',
+  maxParticipants: '',
+  images: ''
 });
 
 const isSubmitting = ref(false);
 const successMessage = ref('');
 const errorMessage = ref('');
 const newInclusivityTag = ref('');
+const newEquipmentItem = ref('');
+const imagePreviewUrls = ref([]);
+const imageUploadStatus = ref(null);
+const selectedImageFiles = ref([]);
 
 // Form refs
 const titleRef = ref(null);
@@ -459,7 +817,11 @@ const sportOptions = [
 ];
 
 const ageGroupOptions = [
-  'Kids (5-12)', 'Teens (13-17)', 'Adults (18-64)', 'Seniors (65+)', 'All Ages'
+  '5-8', '8-12', '12-17', '18-40', '40-60', '60+'
+];
+
+const costUnitOptions = [
+  'per-session', 'per-class', 'per-term', 'per-month', 'free'
 ];
 
 const accessibilityOptions = [
@@ -486,6 +848,19 @@ const minuteOptions = ['00', '15', '30', '45'];
 // Get minimum date (today)
 const minDate = computed(() => {
   return new Date().toISOString().split('T')[0];
+});
+
+// Load organizer email on mount
+onMounted(async () => {
+  try {
+    const currentUser = await authService.getCurrentUser();
+    if (currentUser.user) {
+      form.organizer_email = currentUser.user.email;
+      form.contact.email = currentUser.user.email; // Default contact email to organizer email
+    }
+  } catch (error) {
+    console.error('Error loading user data:', error);
+  }
 });
 
 // Validation functions
@@ -560,6 +935,68 @@ function validateField(fieldName) {
         error = 'Start date cannot be in the past.';
       }
       break;
+
+    case 'costUnit':
+      if (!form.costUnit) {
+        error = 'Please select a cost unit.';
+      }
+      break;
+
+    case 'venueName':
+      if (!form.venue.name.trim()) {
+        error = 'Venue name is required.';
+      }
+      break;
+
+    case 'venueAddress':
+      if (!form.venue.address.trim()) {
+        error = 'Venue address is required.';
+      }
+      break;
+
+    case 'venueSuburb':
+      if (!form.venue.suburb.trim()) {
+        error = 'Venue suburb is required.';
+      }
+      break;
+
+    case 'venuePostcode':
+      if (!form.venue.postcode.trim()) {
+        error = 'Venue postcode is required.';
+      } else if (!/^\d{4}$/.test(form.venue.postcode.trim())) {
+        error = 'Postcode must be 4 digits.';
+      }
+      break;
+
+    case 'contactEmail':
+      if (!form.contact.email.trim()) {
+        error = 'Contact email is required.';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact.email)) {
+        error = 'Please enter a valid email address.';
+      }
+      break;
+
+    case 'contactPhone':
+      if (!form.contact.phone.trim()) {
+        error = 'Contact phone is required.';
+      } else if (!/^[\d\s\-+()]{8,}$/.test(form.contact.phone.trim())) {
+        error = 'Please enter a valid phone number.';
+      }
+      break;
+
+    case 'maxParticipants':
+      if (!form.maxParticipants || form.maxParticipants < 1) {
+        error = 'Maximum participants must be at least 1.';
+      } else if (form.maxParticipants > 1000) {
+        error = 'Maximum participants cannot exceed 1000.';
+      }
+      break;
+
+    case 'images':
+      if (selectedImageFiles.value.length > 10) {
+        error = 'Maximum 10 images allowed.';
+      }
+      break;
   }
 
   errors[fieldName] = error;
@@ -573,10 +1010,18 @@ function validateAll() {
     validateField('ageGroups') &&
     validateField('description') &&
     validateField('cost') &&
+    validateField('costUnit') &&
     validateField('scheduleDays') &&
     validateField('startTime') &&
     validateField('endTime') &&
-    validateField('startDate')
+    validateField('startDate') &&
+    validateField('venueName') &&
+    validateField('venueAddress') &&
+    validateField('venueSuburb') &&
+    validateField('venuePostcode') &&
+    validateField('contactEmail') &&
+    validateField('contactPhone') &&
+    validateField('maxParticipants')
   );
 }
 
@@ -587,21 +1032,37 @@ const isFormValid = computed(() => {
          form.ageGroups.length > 0 &&
          form.description.trim() &&
          form.cost >= 0 &&
+         form.costUnit &&
          form.schedule.days.length > 0 &&
          form.schedule.startHour &&
          form.schedule.startMinute &&
          form.schedule.endHour &&
          form.schedule.endMinute &&
          form.schedule.startDate &&
+         form.venue.name.trim() &&
+         form.venue.address.trim() &&
+         form.venue.suburb.trim() &&
+         form.venue.postcode.trim() &&
+         form.contact.email.trim() &&
+         form.contact.phone.trim() &&
+         form.maxParticipants > 0 &&
          !errors.title &&
          !errors.sport &&
          !errors.ageGroups &&
          !errors.description &&
          !errors.cost &&
+         !errors.costUnit &&
          !errors.scheduleDays &&
          !errors.startTime &&
          !errors.endTime &&
-         !errors.startDate;
+         !errors.startDate &&
+         !errors.venueName &&
+         !errors.venueAddress &&
+         !errors.venueSuburb &&
+         !errors.venuePostcode &&
+         !errors.contactEmail &&
+         !errors.contactPhone &&
+         !errors.maxParticipants;
 });
 
 // Event handlers
@@ -635,6 +1096,119 @@ function removeInclusivityTag(index) {
   form.inclusivityTags.splice(index, 1);
 }
 
+function addEquipmentItem() {
+  const item = newEquipmentItem.value.trim();
+  if (item && !form.equipment.required.includes(item)) {
+    form.equipment.required.push(item);
+    newEquipmentItem.value = '';
+  }
+}
+
+function removeEquipmentItem(index) {
+  form.equipment.required.splice(index, 1);
+}
+
+// Image handling functions
+function handleImageUpload(event) {
+  const files = Array.from(event.target.files);
+  
+  // Clear previous status
+  imageUploadStatus.value = null;
+  
+  // Validate file types and sizes
+  const validFiles = [];
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+  
+  for (const file of files) {
+    if (!allowedTypes.includes(file.type)) {
+      imageUploadStatus.value = {
+        type: 'error',
+        message: `${file.name} is not a valid image type. Please use JPG, PNG, or GIF.`
+      };
+      return;
+    }
+    
+    if (file.size > maxSize) {
+      imageUploadStatus.value = {
+        type: 'error',
+        message: `${file.name} is too large. Maximum size is 5MB.`
+      };
+      return;
+    }
+    
+    validFiles.push(file);
+  }
+  
+  // Check total number of images
+  if (selectedImageFiles.value.length + validFiles.length > 10) {
+    imageUploadStatus.value = {
+      type: 'error',
+      message: 'Maximum 10 images allowed. Please remove some images first.'
+    };
+    return;
+  }
+  
+  // Add files to selected files
+  selectedImageFiles.value.push(...validFiles);
+  
+  // Create preview URLs
+  validFiles.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imagePreviewUrls.value.push({
+        url: e.target.result,
+        name: file.name,
+        file: file
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+  
+  // Update form.images with file names (placeholder URLs)
+  form.images = selectedImageFiles.value.map(file => `/assets/images/${file.name}`);
+  
+  // Show success message
+  if (validFiles.length > 0) {
+    imageUploadStatus.value = {
+      type: 'success',
+      message: `${validFiles.length} image(s) added successfully.`
+    };
+    
+    // Clear status after 3 seconds
+    setTimeout(() => {
+      imageUploadStatus.value = null;
+    }, 3000);
+  }
+  
+  // Validate images field
+  validateField('images');
+}
+
+function removeImage(index) {
+  // Remove from preview URLs
+  imagePreviewUrls.value.splice(index, 1);
+  
+  // Remove from selected files
+  selectedImageFiles.value.splice(index, 1);
+  
+  // Update form.images
+  form.images = selectedImageFiles.value.map(file => `/assets/images/${file.name}`);
+  
+  // Clear any error messages
+  errors.images = '';
+  
+  imageUploadStatus.value = {
+    type: 'success',
+    message: 'Image removed successfully.'
+  };
+  
+  // Clear status after 2 seconds
+  setTimeout(() => {
+    imageUploadStatus.value = null;
+  }, 2000);
+}
+
 async function focusFirstError() {
   await nextTick();
   const fieldOrder = [
@@ -665,17 +1239,61 @@ async function handleSubmit() {
   isSubmitting.value = true;
 
   try {
-    // Simulate API call (replace with actual implementation)
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Check authentication first
+    const currentUser = await authService.getCurrentUser();
+    if (!currentUser.user) {
+      errorMessage.value = 'You must be logged in to create a program. Please log in and try again.';
+      return;
+    }
 
-    // TODO: Save program data to backend/Firestore
-    console.log('Program data to save:', {
-      ...form,
-      createdAt: new Date().toISOString(),
-      createdBy: 'current-user-id' // Replace with actual user ID
-    });
+    // Format schedule data to match required structure
+    const scheduleData = form.schedule.days.map(day => ({
+      day: day.charAt(0).toUpperCase() + day.slice(1), // Capitalize first letter
+      start: `${form.schedule.startHour}:${form.schedule.startMinute}`,
+      end: `${form.schedule.endHour}:${form.schedule.endMinute}`,
+      frequency: 'weekly',
+      startDate: form.schedule.startDate,
+      endDate: null
+    }));
 
-    successMessage.value = 'Program launched successfully! Participants can now find and join your program.';
+    // Format the complete program data
+    const programData = {
+      title: form.title.trim(),
+      sport: form.sport,
+      organizer_email: form.organizer_email,
+      description: form.description.trim(),
+      ageGroups: form.ageGroups,
+      cost: form.cost,
+      costUnit: form.costUnit,
+      accessibility: form.accessibility,
+      inclusivityTags: form.inclusivityTags,
+      schedule: scheduleData,
+      venue: {
+        name: form.venue.name.trim(),
+        address: form.venue.address.trim(),
+        suburb: form.venue.suburb.trim(),
+        postcode: form.venue.postcode.trim()
+      },
+      equipment: {
+        provided: form.equipment.provided,
+        required: form.equipment.required
+      },
+      contact: {
+        email: form.contact.email.trim(),
+        phone: form.contact.phone.trim()
+      },
+      images: form.images, // Empty array for now
+      maxParticipants: form.maxParticipants
+    };
+
+    console.log('Submitting program data:', programData);
+
+    // Call cloud function to create program
+    const result = await dataService.createProgram(programData);
+
+    console.log('Program created with ID:', result.programId);
+
+    successMessage.value = `Program launched successfully! Your program ID is ${result.programId}. Participants can now find and join your program.`;
 
     // Redirect after short delay
     setTimeout(() => {
@@ -683,7 +1301,7 @@ async function handleSubmit() {
     }, 3000);
 
   } catch (error) {
-    errorMessage.value = 'Failed to launch program. Please try again.';
+    errorMessage.value = error.message || 'Failed to launch program. Please try again.';
     console.error('Launch program error:', error);
   } finally {
     isSubmitting.value = false;
@@ -726,5 +1344,33 @@ async function handleSubmit() {
     position: relative !important;
     top: auto !important;
   }
+}
+
+/* Image upload styling */
+.img-thumbnail {
+  transition: transform 0.2s ease;
+}
+
+.img-thumbnail:hover {
+  transform: scale(1.05);
+}
+
+.position-relative .btn-danger {
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+#program-images {
+  cursor: pointer;
+}
+
+#program-images:hover {
+  border-color: #0d6efd;
 }
 </style>

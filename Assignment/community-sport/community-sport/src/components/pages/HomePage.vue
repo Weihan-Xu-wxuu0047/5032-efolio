@@ -1,10 +1,8 @@
 <script setup>
-import { computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import SearchBar from '../SearchBar.vue';
 import ProgramCard from '../ProgramCard.vue';
-
-// Use relative import from /src/components/pages/ → /src/assets/data/
-import programs from '../../assets/data/programs.json';
+import dataService from '../../services/DataService.js';
 
 // Hero copy (static)
 const hero = {
@@ -13,18 +11,23 @@ const hero = {
     'Discover inclusive, low-cost community sport programs across Melbourne. Start with a quick search below.'
 };
 
-// Score & pick up to 6 items for "Featured"
-const featured = computed(() => {
-  const list = Array.isArray(programs) ? programs : [];
-  const withScore = list.map(p => {
-    let score = 0;
-    if (p.inclusivityTags?.includes('beginner-friendly')) score += 2;
-    if (p.cost === 0) score += 2;
-    if (p.cost > 0 && p.cost <= 5) score += 1;
-    return { ...p, _score: score };
-  });
-  withScore.sort((a, b) => b._score - a._score || a.cost - b.cost);
-  return withScore.slice(0, 6);
+// State
+const featured = ref([]);
+const loading = ref(true);
+const error = ref(null);
+
+// Load featured programs on mount
+onMounted(async () => {
+  try {
+    loading.value = true;
+    error.value = null;
+    featured.value = await dataService.getFeaturedPrograms(6);
+  } catch (err) {
+    console.error('Error loading featured programs:', err);
+    error.value = 'Failed to load featured programs. Please try again later.';
+  } finally {
+    loading.value = false;
+  }
 });
 </script>
 
@@ -48,16 +51,32 @@ const featured = computed(() => {
         <RouterLink :to="{ name: 'find' }" class="link-primary">See all</RouterLink>
       </div>
 
-      <!-- Responsive grid: 1 / 2 / 3 columns -->
-      <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
-        <div v-for="p in featured" :key="p.id" class="col">
-          <ProgramCard :program="p" />
+      <!-- Loading State -->
+      <div v-if="loading" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading featured programs...</span>
         </div>
+        <p class="mt-2 mb-0 text-muted">Loading featured programs...</p>
       </div>
 
-      <div v-if="featured.length === 0" class="text-center text-muted py-5">
-        <i class="bi bi-emoji-neutral" aria-hidden="true"></i>
-        <p class="mt-2 mb-0">No featured programs yet. Please check back soon.</p>
+      <!-- Error State -->
+      <div v-else-if="error" class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>
+        {{ error }}
+      </div>
+
+      <!-- Programs Grid -->
+      <div v-else>
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+          <div v-for="p in featured" :key="p.id" class="col">
+            <ProgramCard :program="p" />
+          </div>
+        </div>
+
+        <div v-if="featured.length === 0" class="text-center text-muted py-5">
+          <i class="bi bi-emoji-neutral" aria-hidden="true"></i>
+          <p class="mt-2 mb-0">No featured programs yet. Please check back soon.</p>
+        </div>
       </div>
     </section>
   </div>
