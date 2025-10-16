@@ -28,6 +28,72 @@ admin.initializeApp();
 setGlobalOptions({ maxInstances: 10 });
 
 /**
+ * Cloud Function to create a new appointment in Firestore
+ * Receives appointment data from frontend and stores it in the appointments collection
+ */
+exports.createAppointment = onCall(async (request) => {
+  try {
+    // Log the incoming request for debugging
+    logger.info("Creating new appointment", { data: request.data });
+
+    // Validate required fields
+    const appointmentData = request.data;
+    if (!appointmentData) {
+      throw new Error("Appointment data is required");
+    }
+
+    // Validate required fields
+    const requiredFields = ["program_id", "user_email", "time_slot"];
+    for (const field of requiredFields) {
+      if (!appointmentData[field]) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+
+    // Validate time_slot array
+    if (!Array.isArray(appointmentData.time_slot) || appointmentData.time_slot.length === 0) {
+      throw new Error("At least one time slot must be selected");
+    }
+
+    // Get Firestore instance
+    const db = admin.firestore();
+
+    // Create a new document reference with auto-generated ID
+    const appointmentRef = db.collection("appointments").doc();
+    const appointmentId = appointmentRef.id;
+
+    // Prepare the appointment data with auto-generated ID
+    const appointmentToSave = {
+      appointment_id: appointmentId,
+      program_id: appointmentData.program_id,
+      user_email: appointmentData.user_email,
+      time_slot: appointmentData.time_slot,
+      status: "confirmed",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Save the appointment to Firestore
+    await appointmentRef.set(appointmentToSave);
+
+    logger.info("Appointment created successfully", { appointmentId: appointmentId });
+
+    // Return success response with the appointment ID
+    return {
+      success: true,
+      appointmentId: appointmentId,
+      message: "Appointment booked successfully"
+    };
+
+  } catch (error) {
+    logger.error("Error creating appointment", { error: error.message });
+    
+    // Return error response
+    throw new Error(`Failed to create appointment: ${error.message}`);
+  }
+});
+
+/**
  * Cloud Function to create a new program in Firestore
  * Receives program data from frontend and stores it in the programs collection
  */

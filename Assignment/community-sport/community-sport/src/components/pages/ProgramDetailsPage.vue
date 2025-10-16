@@ -603,7 +603,11 @@ async function handleBooking() {
   }
 
   if (currentUser.role === 'member') {
-    router.push({ name: 'member-appointment' });
+    // Navigate to appointment page with program ID
+    router.push({ 
+      name: 'member-appointment', 
+      params: { programId: program.value.id } 
+    });
   } else {
     alert('Only members can book programs. Please switch to member role or register as a member.');
   }

@@ -326,6 +326,39 @@ class DataService {
     }
   }
 
+  // Create a new appointment using Cloud Function
+  async createAppointment(appointmentData) {
+    try {
+      console.log('Creating appointment via Cloud Function...', appointmentData);
+      
+      // Get the Cloud Function reference
+      const createAppointmentFunction = httpsCallable(functions, 'createAppointment');
+      
+      // Call the Cloud Function
+      const result = await createAppointmentFunction(appointmentData);
+      
+      console.log('Appointment created successfully:', result.data);
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error creating appointment:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to book appointment. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid appointment data provided.';
+      } else if (error.code === 'functions/permission-denied') {
+        errorMessage = 'You do not have permission to book appointments.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to book an appointment.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
   // Get featured programs (for home page)
   async getFeaturedPrograms(limit = 6) {
     try {

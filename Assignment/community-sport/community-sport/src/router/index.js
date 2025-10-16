@@ -28,9 +28,10 @@ const routes = [
   
   // Member-specific routes
   { 
-    path: '/member-appointment', 
+    path: '/member-appointment/:programId?', 
     name: 'member-appointment', 
     component: () => import('../components/pages/MemberAppointmentPage.vue'),
+    props: true,
     meta: { requiresAuth: true, requiresRole: 'member' }
   },
 
