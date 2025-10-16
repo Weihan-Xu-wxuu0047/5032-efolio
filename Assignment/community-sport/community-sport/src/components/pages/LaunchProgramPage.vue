@@ -487,13 +487,36 @@
                   <!-- Interactive Map -->
                   <div class="mb-3">
                     <label class="form-label">Location Map</label>
-                    <div 
-                      ref="mapContainer" 
-                      class="map-container border rounded"
-                      style="height: 300px; width: 100%;"
-                    ></div>
+                    <div class="position-relative">
+                      <div 
+                        ref="mapContainer" 
+                        class="map-container border rounded"
+                        style="height: 300px; width: 100%;"
+                      ></div>
+                      
+                      <!-- Map loading overlay -->
+                      <div 
+                        v-if="isSearching" 
+                        class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75 rounded"
+                        style="z-index: 1000;"
+                      >
+                        <div class="text-center">
+                          <div class="spinner-border text-primary mb-2" role="status">
+                            <span class="visually-hidden">Finding address...</span>
+                          </div>
+                          <div class="small text-muted">Finding address...</div>
+                        </div>
+                      </div>
+                    </div>
                     <div class="form-text">
-                      The map will show your selected venue location. Use the address search above to place a marker.
+                      <i class="bi bi-info-circle me-1"></i>
+                      <strong>Interactive Map:</strong> Click anywhere on the map to automatically find the address at that location, or use the address search above to find a specific address.
+                    </div>
+                    <div class="mt-2">
+                      <small class="text-muted">
+                        <i class="bi bi-cursor me-1"></i>
+                        Tip: The map cursor changes to a crosshair to indicate it's clickable
+                      </small>
                     </div>
                   </div>
 
@@ -1016,6 +1039,9 @@ async function initializeMap() {
     // Add navigation controls
     map.value.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
+    // Add click event listener for reverse geocoding
+    map.value.on('click', handleMapClick);
+
     console.log('Mapbox initialized successfully');
   } catch (error) {
     console.error('Error initializing Mapbox:', error);
@@ -1183,6 +1209,65 @@ function clearAddressSearch() {
   form.venue.postcode = '';
   form.venue.lat = null;
   form.venue.lng = null;
+}
+
+// Handle map click for reverse geocoding
+async function handleMapClick(event) {
+  const { lng, lat } = event.lngLat;
+  
+  try {
+    // Show loading state
+    isSearching.value = true;
+    
+    // Perform reverse geocoding
+    const addressData = await reverseGeocode(lng, lat);
+    
+    if (addressData) {
+      // Create a suggestion object similar to search results
+      const suggestion = {
+        id: `reverse-${Date.now()}`,
+        place_name: addressData.place_name,
+        center: [lng, lat],
+        context: addressData.context || [],
+        properties: addressData.properties || {}
+      };
+      
+      // Auto-select this address
+      selectAddress(suggestion);
+    }
+  } catch (error) {
+    console.error('Error with map click reverse geocoding:', error);
+  } finally {
+    isSearching.value = false;
+  }
+}
+
+// Reverse geocoding function
+async function reverseGeocode(lng, lat) {
+  try {
+    const response = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+      `access_token=${mapboxgl.accessToken}&` +
+      `country=AU&` +
+      `types=address,poi&` +
+      `limit=1`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to reverse geocode location');
+    }
+
+    const data = await response.json();
+    
+    if (data.features && data.features.length > 0) {
+      return data.features[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error in reverse geocoding:', error);
+    return null;
+  }
 }
 
 // Validation functions
@@ -1702,6 +1787,13 @@ async function handleSubmit() {
 .map-container {
   border-radius: 8px;
   overflow: hidden;
+  cursor: crosshair;
+  position: relative;
+}
+
+.map-container:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: box-shadow 0.2s ease;
 }
 
 .suggestion-item:hover {
