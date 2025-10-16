@@ -359,6 +359,112 @@ class DataService {
     }
   }
 
+  // Get user appointments using Cloud Function
+  async getUserAppointments(userEmail) {
+    try {
+      console.log('Getting user appointments via Cloud Function...', userEmail);
+      
+      // Get the Cloud Function reference
+      const getUserAppointmentsFunction = httpsCallable(functions, 'getUserAppointments');
+      
+      // Call the Cloud Function
+      const result = await getUserAppointmentsFunction({ user_email: userEmail });
+      
+      console.log('User appointments retrieved successfully:', result.data);
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error getting user appointments:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to load appointments. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid request data.';
+      } else if (error.code === 'functions/permission-denied') {
+        errorMessage = 'You do not have permission to view appointments.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to view your appointments.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Update an existing appointment using Cloud Function
+  async updateAppointment(appointmentId, timeSlots, userEmail) {
+    try {
+      console.log('Updating appointment via Cloud Function...', { appointmentId, timeSlots, userEmail });
+      
+      // Get the Cloud Function reference
+      const updateAppointmentFunction = httpsCallable(functions, 'updateAppointment');
+      
+      // Call the Cloud Function
+      const result = await updateAppointmentFunction({
+        appointment_id: appointmentId,
+        time_slot: timeSlots,
+        user_email: userEmail
+      });
+      
+      console.log('Appointment updated successfully:', result.data);
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to update appointment. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid appointment data provided.';
+      } else if (error.code === 'functions/permission-denied') {
+        errorMessage = 'You do not have permission to update this appointment.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to update appointments.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Cancel appointment
+  async cancelAppointment(appointmentId, userEmail) {
+    try {
+      console.log('Canceling appointment via Cloud Function...', appointmentId, userEmail);
+      
+      // Get the Cloud Function reference
+      const cancelAppointmentFunction = httpsCallable(functions, 'cancelAppointment');
+      
+      // Call the Cloud Function
+      const result = await cancelAppointmentFunction({
+        appointmentId: appointmentId,
+        userEmail: userEmail
+      });
+      
+      console.log('Appointment cancelled successfully:', result.data);
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error canceling appointment:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to cancel appointment. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid appointment data provided.';
+      } else if (error.code === 'functions/permission-denied') {
+        errorMessage = 'You do not have permission to cancel this appointment.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to cancel appointments.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
   // Get featured programs (for home page)
   async getFeaturedPrograms(limit = 6) {
     try {

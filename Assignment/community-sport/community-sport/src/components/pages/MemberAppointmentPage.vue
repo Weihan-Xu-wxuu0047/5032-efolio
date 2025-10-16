@@ -5,9 +5,13 @@
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
           <div>
-            <h1 class="h3 mb-1">Book Your Appointment</h1>
+            <h1 class="h3 mb-1">{{ isEditMode ? 'Edit Your Appointment' : 'Book Your Appointment' }}</h1>
             <p class="text-muted mb-0" v-if="program">
-              Booking for: <strong>{{ program.title }}</strong>
+              {{ isEditMode ? 'Editing appointment for' : 'Booking for' }}: <strong>{{ program.title }}</strong>
+            </p>
+            <p class="text-muted small mb-0" v-if="isEditMode && existingAppointment">
+              <i class="bi bi-info-circle me-1"></i>
+              Current appointment: {{ existingAppointment.time_slot.length }} time slot(s) selected
             </p>
           </div>
           <div class="d-flex gap-2">
@@ -35,7 +39,7 @@
         <div v-else-if="!program" class="text-center py-5">
           <i class="bi bi-calendar-x display-1 text-muted mb-4"></i>
           <h4 class="mb-3">No Program Selected</h4>
-          <p class="text-muted mb-4">
+            <p class="text-muted mb-4">
             Please select a program from the programs list to book an appointment.
           </p>
           <RouterLink :to="{ name: 'find' }" class="btn btn-primary">
@@ -53,7 +57,7 @@
                   <i class="bi bi-info-circle me-2"></i>
                   Program Details
                 </h5>
-              </div>
+                  </div>
               <div class="card-body">
                 <h6 class="mb-2">{{ program.title }}</h6>
                 <p class="text-muted small mb-3">{{ program.description }}</p>
@@ -70,7 +74,7 @@
                       <div>
                         <strong>{{ schedule.day }}s</strong><br>
                         <small>{{ schedule.start }} - {{ schedule.end }}</small>
-                      </div>
+                </div>
                       <button
                         @click="toggleTimeSlot(schedule)"
                         class="btn btn-sm"
@@ -78,9 +82,9 @@
                       >
                         {{ selectedSlots.some(slot => slot.day === schedule.day) ? 'Selected' : 'Select' }}
                       </button>
-                    </div>
                   </div>
                 </div>
+              </div>
 
                 <div class="mb-3">
                   <strong>Venue:</strong><br>
@@ -95,9 +99,9 @@
                   <span class="text-primary ms-2">
                     {{ program.cost === 0 ? 'Free' : `$${program.cost} ${program.costUnit}` }}
                   </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
             <!-- Selected Time Slots Summary -->
             <div v-if="selectedSlots.length > 0" class="card mt-3">
@@ -123,10 +127,10 @@
                   >
                     <i class="bi bi-x"></i>
                   </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
           <!-- Calendar -->
           <div class="col-lg-8">
@@ -163,14 +167,25 @@
                     >
                       Clear Selection
                     </button>
+                    <!-- Cancel Appointment Button (only in edit mode) -->
+                    <button
+                      v-if="isEditMode"
+                      @click="cancelAppointment"
+                      class="btn btn-outline-danger"
+                      :disabled="isCanceling || isBooking"
+                    >
+                      <span v-if="isCanceling" class="spinner-border spinner-border-sm me-2"></span>
+                      <i v-else class="bi bi-x-circle me-2"></i>
+                      {{ isCanceling ? 'Canceling...' : 'Cancel Appointment' }}
+                    </button>
                     <button
                       @click="bookAppointment"
                       class="btn btn-success"
-                      :disabled="selectedSlots.length === 0 || isBooking"
+                      :disabled="selectedSlots.length === 0 || isBooking || isCanceling"
                     >
                       <span v-if="isBooking" class="spinner-border spinner-border-sm me-2"></span>
                       <i v-else class="bi bi-calendar-check me-2"></i>
-                      {{ isBooking ? 'Booking...' : 'Book Appointment' }}
+                      {{ isBooking ? (isEditMode ? 'Updating...' : 'Booking...') : (isEditMode ? 'Update Appointment' : 'Book Appointment') }}
                     </button>
                   </div>
                 </div>
@@ -218,9 +233,15 @@ const loading = ref(true);
 const error = ref(null);
 const selectedSlots = ref([]);
 const isBooking = ref(false);
+const isCanceling = ref(false);
 const successMessage = ref('');
 const errorMessage = ref('');
 const calendarRef = ref(null);
+
+// Edit mode state
+const isEditMode = ref(false);
+const existingAppointment = ref(null);
+const editAppointmentId = ref(null);
 
 // Calendar configuration
 const calendarOptions = ref({
@@ -244,6 +265,7 @@ const calendarOptions = ref({
 // Load program data
 onMounted(async () => {
   const programId = props.programId || route.params.programId;
+  const editId = route.query.edit;
   
   if (!programId) {
     loading.value = false;
@@ -253,11 +275,20 @@ onMounted(async () => {
   try {
     loading.value = true;
     error.value = null;
+    
+    // Load program details
     program.value = await dataService.getProgram(programId);
     
     if (!program.value) {
       error.value = 'Program not found. Please check the program ID and try again.';
       return;
+    }
+
+    // Check if this is edit mode
+    if (editId) {
+      isEditMode.value = true;
+      editAppointmentId.value = editId;
+      await loadExistingAppointment(editId);
     }
 
     // Generate calendar events for the program schedule
@@ -353,7 +384,39 @@ function clearSelection() {
   selectedSlots.value = [];
 }
 
-// Book appointment
+// Load existing appointment for edit mode
+async function loadExistingAppointment(appointmentId) {
+  try {
+    const currentUser = await authService.getCurrentUser();
+    if (!currentUser.user) {
+      error.value = 'You must be logged in to edit appointments.';
+      return;
+    }
+
+    // Get user appointments to find the specific one
+    const result = await dataService.getUserAppointments(currentUser.user.email);
+    const appointment = result.appointments.find(apt => apt.id === appointmentId || apt.appointment_id === appointmentId);
+    
+    if (!appointment) {
+      error.value = 'Appointment not found or you do not have permission to edit it.';
+      return;
+    }
+
+    if (appointment.program_id !== program.value.id) {
+      error.value = 'This appointment does not belong to the current program.';
+      return;
+    }
+
+    existingAppointment.value = appointment;
+    selectedSlots.value = [...appointment.time_slot]; // Copy existing time slots
+    
+  } catch (err) {
+    console.error('Error loading existing appointment:', err);
+    error.value = 'Failed to load appointment details.';
+  }
+}
+
+// Book or update appointment
 async function bookAppointment() {
   if (selectedSlots.value.length === 0) {
     errorMessage.value = 'Please select at least one time slot.';
@@ -372,17 +435,27 @@ async function bookAppointment() {
       return;
     }
 
-    // Prepare appointment data
-    const appointmentData = {
-      program_id: program.value.id,
-      user_email: currentUser.user.email,
-      time_slot: selectedSlots.value
-    };
+    let result;
 
-    // Create appointment
-    const result = await dataService.createAppointment(appointmentData);
-
-    successMessage.value = `Appointment booked successfully! Your appointment ID is ${result.appointmentId}.`;
+    if (isEditMode.value && editAppointmentId.value) {
+      // Update existing appointment
+      result = await dataService.updateAppointment(
+        editAppointmentId.value,
+        selectedSlots.value,
+        currentUser.user.email
+      );
+      successMessage.value = `Appointment updated successfully! Your appointment ID is ${editAppointmentId.value}.`;
+    } else {
+      // Create new appointment
+      const appointmentData = {
+        program_id: program.value.id,
+        user_email: currentUser.user.email,
+        time_slot: selectedSlots.value
+      };
+      
+      result = await dataService.createAppointment(appointmentData);
+      successMessage.value = `Appointment booked successfully! Your appointment ID is ${result.appointmentId}.`;
+    }
     
     // Clear selections
     selectedSlots.value = [];
@@ -393,10 +466,61 @@ async function bookAppointment() {
     }, 3000);
 
   } catch (err) {
-    console.error('Error booking appointment:', err);
-    errorMessage.value = err.message || 'Failed to book appointment. Please try again.';
+    console.error('Error with appointment:', err);
+    errorMessage.value = err.message || `Failed to ${isEditMode.value ? 'update' : 'book'} appointment. Please try again.`;
   } finally {
     isBooking.value = false;
+  }
+}
+
+// Cancel appointment
+async function cancelAppointment() {
+  if (!isEditMode.value || !editAppointmentId.value) {
+    errorMessage.value = 'No appointment to cancel.';
+    return;
+  }
+
+  // Show confirmation dialog
+  const confirmed = confirm(
+    `Are you sure you want to cancel this appointment for "${program.value.title}"?\n\n` +
+    `This action cannot be undone. You will need to book a new appointment if you change your mind.`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    isCanceling.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+
+    // Get current user
+    const currentUser = await authService.getCurrentUser();
+    if (!currentUser.user) {
+      errorMessage.value = 'You must be logged in to cancel appointments.';
+      return;
+    }
+
+    // Cancel the appointment
+    await dataService.cancelAppointment(editAppointmentId.value, currentUser.user.email);
+    
+    successMessage.value = `Appointment cancelled successfully! You will be redirected to your account page.`;
+    
+    // Clear selections and reset form
+    selectedSlots.value = [];
+    existingAppointment.value = null;
+
+    // Redirect after delay
+    setTimeout(() => {
+      router.push({ name: 'member-account' });
+    }, 3000);
+
+  } catch (err) {
+    console.error('Error canceling appointment:', err);
+    errorMessage.value = err.message || 'Failed to cancel appointment. Please try again.';
+  } finally {
+    isCanceling.value = false;
   }
 }
 </script>

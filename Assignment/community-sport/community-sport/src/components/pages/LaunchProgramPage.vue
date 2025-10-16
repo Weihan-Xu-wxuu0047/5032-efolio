@@ -409,29 +409,117 @@
                     </div>
                   </div>
 
-                  <!-- Address -->
+                  <!-- Address Search Section -->
                   <div class="mb-3">
-                    <label for="venue-address" class="form-label">
-                      Address <span class="text-danger">*</span>
+                    <label for="address-search" class="form-label">
+                      Address Search <span class="text-danger">*</span>
                     </label>
-                    <input
-                      id="venue-address"
-                      type="text"
-                      class="form-control"
-                      :class="{ 'is-invalid': touched.venueAddress && errors.venueAddress }"
-                      v-model.trim="form.venue.address"
-                      @blur="onBlur('venueAddress')"
-                      @input="onInput('venueAddress')"
-                      placeholder="e.g. 88 Rathdowne St"
-                      required
-                    />
-                    <div v-if="touched.venueAddress && errors.venueAddress" class="invalid-feedback">
-                      {{ errors.venueAddress }}
+                    <div class="position-relative">
+                      <div class="input-group">
+                        <input
+                          id="address-search"
+                          type="text"
+                          class="form-control"
+                          v-model="addressSearchQuery"
+                          @input="searchAddresses"
+                          @focus="showSuggestions = addressSuggestions.length > 0"
+                          placeholder="Start typing an address..."
+                          autocomplete="off"
+                        />
+                        <button
+                          type="button"
+                          class="btn btn-outline-secondary"
+                          @click="clearAddressSearch"
+                          :disabled="!addressSearchQuery"
+                        >
+                          <i class="bi bi-x-lg"></i>
+                        </button>
+                      </div>
+                      
+                      <!-- Loading indicator -->
+                      <div v-if="isSearching" class="position-absolute top-50 end-0 translate-middle-y me-5">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                          <span class="visually-hidden">Searching...</span>
+                        </div>
+                      </div>
+
+                      <!-- Address suggestions dropdown -->
+                      <div 
+                        v-if="showSuggestions && addressSuggestions.length > 0" 
+                        class="position-absolute w-100 bg-white border rounded-bottom shadow-lg"
+                        style="top: 100%; z-index: 1000; max-height: 300px; overflow-y: auto;"
+                      >
+                        <div
+                          v-for="suggestion in addressSuggestions"
+                          :key="suggestion.id"
+                          class="p-3 border-bottom suggestion-item"
+                          @click="selectAddress(suggestion)"
+                          style="cursor: pointer;"
+                        >
+                          <div class="fw-medium">{{ suggestion.place_name }}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="form-text">
+                      Search for your venue address. Select from the suggestions to auto-fill address details.
                     </div>
                   </div>
 
-                  <!-- Suburb and Postcode -->
+                  <!-- Address Confirmation -->
+                  <div v-if="showAddressConfirmation" class="mb-3">
+                    <div class="alert alert-info d-flex align-items-center">
+                      <i class="bi bi-info-circle me-2"></i>
+                      <div class="flex-grow-1">
+                        <strong>Selected Address:</strong><br>
+                        {{ selectedAddress.place_name }}
+                      </div>
+                      <div class="ms-3">
+                        <button type="button" class="btn btn-success btn-sm me-2" @click="confirmAddress">
+                          <i class="bi bi-check-lg me-1"></i>Confirm
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @click="cancelAddressSelection">
+                          <i class="bi bi-x-lg me-1"></i>Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Interactive Map -->
+                  <div class="mb-3">
+                    <label class="form-label">Location Map</label>
+                    <div 
+                      ref="mapContainer" 
+                      class="map-container border rounded"
+                      style="height: 300px; width: 100%;"
+                    ></div>
+                    <div class="form-text">
+                      The map will show your selected venue location. Use the address search above to place a marker.
+                    </div>
+                  </div>
+
+                  <!-- Manual Address Fields (Auto-filled) -->
                   <div class="row g-3">
+                    <div class="col-12">
+                      <label for="venue-address" class="form-label">
+                        Street Address <span class="text-danger">*</span>
+                      </label>
+                      <input
+                        id="venue-address"
+                        type="text"
+                        class="form-control"
+                        :class="{ 'is-invalid': touched.venueAddress && errors.venueAddress }"
+                        v-model.trim="form.venue.address"
+                        @blur="onBlur('venueAddress')"
+                        @input="onInput('venueAddress')"
+                        placeholder="e.g. 88 Rathdowne St"
+                        required
+                        readonly
+                      />
+                      <div v-if="touched.venueAddress && errors.venueAddress" class="invalid-feedback">
+                        {{ errors.venueAddress }}
+                      </div>
+                      <div class="form-text">Auto-filled from address search</div>
+                    </div>
                     <div class="col-md-8">
                       <label for="venue-suburb" class="form-label">
                         Suburb <span class="text-danger">*</span>
@@ -446,6 +534,7 @@
                         @input="onInput('venueSuburb')"
                         placeholder="e.g. Carlton"
                         required
+                        readonly
                       />
                       <div v-if="touched.venueSuburb && errors.venueSuburb" class="invalid-feedback">
                         {{ errors.venueSuburb }}
@@ -466,11 +555,20 @@
                         placeholder="e.g. 3053"
                         maxlength="4"
                         required
+                        readonly
                       />
                       <div v-if="touched.venuePostcode && errors.venuePostcode" class="invalid-feedback">
                         {{ errors.venuePostcode }}
                       </div>
                     </div>
+                  </div>
+
+                  <!-- Coordinates Display (for debugging) -->
+                  <div v-if="form.venue.lat && form.venue.lng" class="mt-3">
+                    <small class="text-muted">
+                      <i class="bi bi-geo me-1"></i>
+                      Coordinates: {{ form.venue.lat.toFixed(6) }}, {{ form.venue.lng.toFixed(6) }}
+                    </small>
                   </div>
                 </div>
               </div>
@@ -706,10 +804,12 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, nextTick, onMounted } from 'vue';
+import { reactive, ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import authService from '../../services/AuthService.js';
 import dataService from '../../services/DataService.js';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 const router = useRouter();
 
@@ -736,7 +836,9 @@ const form = reactive({
     name: '',
     address: '',
     suburb: '',
-    postcode: ''
+    postcode: '',
+    lat: null,
+    lng: null
   },
   equipment: {
     provided: false,
@@ -802,6 +904,17 @@ const imagePreviewUrls = ref([]);
 const imageUploadStatus = ref(null);
 const selectedImageFiles = ref([]);
 
+// Mapbox related state
+const map = ref(null);
+const mapContainer = ref(null);
+const marker = ref(null);
+const addressSearchQuery = ref('');
+const addressSuggestions = ref([]);
+const showSuggestions = ref(false);
+const isSearching = ref(false);
+const selectedAddress = ref(null);
+const showAddressConfirmation = ref(false);
+
 // Form refs
 const titleRef = ref(null);
 const sportRef = ref(null);
@@ -850,7 +963,7 @@ const minDate = computed(() => {
   return new Date().toISOString().split('T')[0];
 });
 
-// Load organizer email on mount
+// Load organizer email and initialize map on mount
 onMounted(async () => {
   try {
     const currentUser = await authService.getCurrentUser();
@@ -861,7 +974,216 @@ onMounted(async () => {
   } catch (error) {
     console.error('Error loading user data:', error);
   }
+
+  // Initialize Mapbox
+  await initializeMap();
 });
+
+// Cleanup map on unmount
+onUnmounted(() => {
+  if (map.value) {
+    map.value.remove();
+  }
+});
+
+// Mapbox functions
+async function initializeMap() {
+  try {
+    // Set Mapbox access token
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_API_TOKEN;
+    
+    if (!mapboxgl.accessToken) {
+      console.error('Mapbox access token not found');
+      return;
+    }
+
+    // Wait for next tick to ensure DOM is ready
+    await nextTick();
+    
+    if (!mapContainer.value) {
+      console.error('Map container not found');
+      return;
+    }
+
+    // Initialize map centered on Melbourne, Australia
+    map.value = new mapboxgl.Map({
+      container: mapContainer.value,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [144.9631, -37.8136], // Melbourne coordinates
+      zoom: 10
+    });
+
+    // Add navigation controls
+    map.value.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    console.log('Mapbox initialized successfully');
+  } catch (error) {
+    console.error('Error initializing Mapbox:', error);
+  }
+}
+
+// Debounce function for search
+let searchTimeout = null;
+
+async function searchAddresses() {
+  if (!addressSearchQuery.value.trim() || addressSearchQuery.value.length < 3) {
+    addressSuggestions.value = [];
+    showSuggestions.value = false;
+    return;
+  }
+
+  // Clear previous timeout
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+  }
+
+  // Debounce the search
+  searchTimeout = setTimeout(async () => {
+    await performAddressSearch();
+  }, 300);
+}
+
+async function performAddressSearch() {
+  isSearching.value = true;
+  
+  try {
+    const response = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(addressSearchQuery.value)}.json?` +
+      `access_token=${mapboxgl.accessToken}&` +
+      `country=AU&` +
+      `types=address,poi&` +
+      `limit=5&` +
+      `autocomplete=true`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch address suggestions');
+    }
+
+    const data = await response.json();
+    addressSuggestions.value = data.features.map(feature => ({
+      id: feature.id,
+      place_name: feature.place_name,
+      center: feature.center,
+      context: feature.context || [],
+      properties: feature.properties || {}
+    }));
+    
+    showSuggestions.value = addressSuggestions.value.length > 0;
+  } catch (error) {
+    console.error('Error searching addresses:', error);
+    addressSuggestions.value = [];
+    showSuggestions.value = false;
+  } finally {
+    isSearching.value = false;
+  }
+}
+
+function selectAddress(suggestion) {
+  selectedAddress.value = suggestion;
+  addressSearchQuery.value = suggestion.place_name;
+  showSuggestions.value = false;
+  showAddressConfirmation.value = true;
+
+  // Add marker to map
+  if (marker.value) {
+    marker.value.remove();
+  }
+
+  marker.value = new mapboxgl.Marker()
+    .setLngLat(suggestion.center)
+    .addTo(map.value);
+
+  // Center map on selected location
+  map.value.flyTo({
+    center: suggestion.center,
+    zoom: 15
+  });
+}
+
+function confirmAddress() {
+  if (!selectedAddress.value) return;
+
+  // Parse address components from Mapbox response
+  const addressComponents = parseAddressComponents(selectedAddress.value);
+  
+  // Auto-fill form fields
+  form.venue.address = addressComponents.address;
+  form.venue.suburb = addressComponents.suburb;
+  form.venue.postcode = addressComponents.postcode;
+  form.venue.lat = selectedAddress.value.center[1]; // latitude
+  form.venue.lng = selectedAddress.value.center[0]; // longitude
+
+  showAddressConfirmation.value = false;
+  
+  // Trigger validation for updated fields
+  validateField('venueAddress');
+  validateField('venueSuburb');
+  validateField('venuePostcode');
+}
+
+function parseAddressComponents(suggestion) {
+  const components = {
+    address: '',
+    suburb: '',
+    postcode: '',
+    state: ''
+  };
+
+  // Extract street address from place_name
+  const placeParts = suggestion.place_name.split(',');
+  if (placeParts.length > 0) {
+    components.address = placeParts[0].trim();
+  }
+
+  // Parse context for suburb, postcode, and state
+  if (suggestion.context) {
+    suggestion.context.forEach(ctx => {
+      if (ctx.id.startsWith('postcode')) {
+        components.postcode = ctx.text;
+      } else if (ctx.id.startsWith('place')) {
+        components.suburb = ctx.text;
+      } else if (ctx.id.startsWith('region')) {
+        components.state = ctx.text;
+      }
+    });
+  }
+
+  return components;
+}
+
+function cancelAddressSelection() {
+  selectedAddress.value = null;
+  showAddressConfirmation.value = false;
+  addressSearchQuery.value = '';
+  
+  // Remove marker
+  if (marker.value) {
+    marker.value.remove();
+    marker.value = null;
+  }
+}
+
+function clearAddressSearch() {
+  addressSearchQuery.value = '';
+  addressSuggestions.value = [];
+  showSuggestions.value = false;
+  selectedAddress.value = null;
+  showAddressConfirmation.value = false;
+  
+  // Remove marker
+  if (marker.value) {
+    marker.value.remove();
+    marker.value = null;
+  }
+
+  // Clear form fields
+  form.venue.address = '';
+  form.venue.suburb = '';
+  form.venue.postcode = '';
+  form.venue.lat = null;
+  form.venue.lng = null;
+}
 
 // Validation functions
 function validateField(fieldName) {
@@ -1272,7 +1594,9 @@ async function handleSubmit() {
         name: form.venue.name.trim(),
         address: form.venue.address.trim(),
         suburb: form.venue.suburb.trim(),
-        postcode: form.venue.postcode.trim()
+        postcode: form.venue.postcode.trim(),
+        lat: form.venue.lat,
+        lng: form.venue.lng
       },
       equipment: {
         provided: form.equipment.provided,
@@ -1372,5 +1696,26 @@ async function handleSubmit() {
 
 #program-images:hover {
   border-color: #0d6efd;
+}
+
+/* Mapbox styles */
+.map-container {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.suggestion-item:hover {
+  background-color: #f8f9fa;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none !important;
+}
+
+/* Address search dropdown */
+.position-relative .bg-white {
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 </style>
