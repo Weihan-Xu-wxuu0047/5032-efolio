@@ -100,6 +100,15 @@
                   My {{ currentRole }} Account
                 </RouterLink>
               </li>
+              <li>
+                <RouterLink
+                  :to="{ name: 'notifications' }"
+                  class="dropdown-item"
+                >
+                  <i class="bi bi-bell me-2" aria-hidden="true"></i>
+                  Notifications
+                </RouterLink>
+              </li>
               <li><hr class="dropdown-divider"></li>
               <li>
                 <button @click="handleLogout" class="dropdown-item">

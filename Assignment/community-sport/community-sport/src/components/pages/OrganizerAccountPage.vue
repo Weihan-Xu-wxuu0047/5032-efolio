@@ -56,7 +56,25 @@
             </h5>
           </div>
           <div class="card-body">
-            <div class="text-center py-5">
+            <!-- Loading State -->
+            <div v-if="programsLoading" class="text-center py-5">
+              <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading programs...</span>
+              </div>
+              <p class="text-muted">Loading your programs...</p>
+            </div>
+
+            <!-- Error State -->
+            <div v-else-if="programsError" class="alert alert-danger" role="alert">
+              <i class="bi bi-exclamation-triangle me-2"></i>
+              {{ programsError }}
+              <button @click="loadMyPrograms" class="btn btn-outline-danger btn-sm ms-2">
+                Try Again
+              </button>
+            </div>
+
+            <!-- Empty State -->
+            <div v-else-if="myPrograms.length === 0" class="text-center py-5">
               <i class="bi bi-clipboard-data display-4 text-muted mb-3" aria-hidden="true"></i>
               <h6 class="text-muted mb-3">No Programs Created Yet</h6>
               <p class="text-muted mb-4">
@@ -67,17 +85,71 @@
                 Create Your First Program
               </RouterLink>
             </div>
-            
-            <!-- Future: Program management cards will be displayed here -->
-            <div class="d-none" id="organizer-programs-list">
-              <!-- This section is reserved for displaying organizer's programs -->
-              <!-- Will show program management cards with details like:
-                   - Program name and sport
-                   - Participant count and capacity
-                   - Schedule and venue
-                   - Status (active, draft, completed)
-                   - Actions (edit, view participants, analytics, etc.)
-              -->
+
+            <!-- Programs List -->
+            <div v-else class="row g-4">
+              <div v-for="program in myPrograms" :key="program.id" class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm">
+                  <div class="card-header bg-light border-0">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <h6 class="card-title mb-1">{{ program.title }}</h6>
+                        <small class="text-muted">{{ program.sport }}</small>
+                      </div>
+                      <span class="badge bg-success">Active</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="card-text text-muted small mb-3">
+                      {{ program.description.length > 100 ? program.description.substring(0, 100) + '...' : program.description }}
+                    </p>
+                    
+                    <div class="mb-3">
+                      <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-geo-alt text-muted me-2"></i>
+                        <small class="text-muted">{{ program.venue?.name || 'Venue TBD' }}</small>
+                      </div>
+                      <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-people text-muted me-2"></i>
+                        <small class="text-muted">Max {{ program.maxParticipants }} participants</small>
+                      </div>
+                      <div class="d-flex align-items-center">
+                        <i class="bi bi-currency-dollar text-muted me-2"></i>
+                        <small class="text-muted">
+                          {{ program.cost === 0 ? 'Free' : `$${program.cost} ${program.costUnit}` }}
+                        </small>
+                      </div>
+                    </div>
+
+                    <div class="mb-3">
+                      <small class="text-muted d-block">Schedule:</small>
+                      <div v-for="schedule in program.schedule.slice(0, 2)" :key="schedule.day" class="small text-muted">
+                        {{ schedule.day }}s: {{ schedule.start }} - {{ schedule.end }}
+                      </div>
+                      <small v-if="program.schedule.length > 2" class="text-muted">
+                        +{{ program.schedule.length - 2 }} more days
+                      </small>
+                    </div>
+                  </div>
+                  <div class="card-footer bg-transparent border-0">
+                    <div class="d-flex gap-2">
+                      <RouterLink 
+                        :to="{ name: 'edit-program', params: { id: program.id } }" 
+                        class="btn btn-primary btn-sm flex-fill"
+                      >
+                        <i class="bi bi-pencil me-1"></i>
+                        Edit
+                      </RouterLink>
+                      <button 
+                        @click="viewProgramDetails(program)" 
+                        class="btn btn-outline-secondary btn-sm"
+                      >
+                        <i class="bi bi-eye"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -142,6 +214,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import authService from '../../services/AuthService.js';
+import dataService from '../../services/DataService.js';
 import MyAccount from '../MyAccount.vue';
 import RoleSwitcher from '../RoleSwitcher.vue';
 
@@ -154,10 +227,42 @@ const hasMemberRole = computed(() => {
   return availableRoles.includes('member');
 });
 
+// Program management state
+const myPrograms = ref([]);
+const programsLoading = ref(false);
+const programsError = ref(null);
+
+// Load user programs
+async function loadMyPrograms() {
+  if (!currentUser.value.user?.email) return;
+  
+  try {
+    programsLoading.value = true;
+    programsError.value = null;
+    
+    // Get all programs and filter by organizer email
+    const allPrograms = await dataService.getPrograms();
+    myPrograms.value = allPrograms.filter(program => 
+      program.organizer_email === currentUser.value.user.email
+    );
+    
+    console.log(`Loaded ${myPrograms.value.length} programs for organizer`);
+  } catch (error) {
+    console.error('Error loading organizer programs:', error);
+    programsError.value = 'Failed to load your programs. Please try again.';
+  } finally {
+    programsLoading.value = false;
+  }
+}
+
 // Load user data on mount
 onMounted(async () => {
   const userData = await authService.getCurrentUser();
   currentUser.value = userData;
+  
+  if (userData.user) {
+    await loadMyPrograms();
+  }
 });
 
 // Listen for auth state changes
@@ -176,6 +281,11 @@ onUnmounted(() => {
     unsubscribe();
   }
 });
+
+// View program details
+function viewProgramDetails(program) {
+  router.push({ name: 'program', params: { id: program.id } });
+}
 
 // Handle logout
 async function handleLogout() {

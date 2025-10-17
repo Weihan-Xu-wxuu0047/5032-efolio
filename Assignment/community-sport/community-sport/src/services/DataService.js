@@ -465,6 +465,226 @@ class DataService {
     }
   }
 
+  // Update program
+  async updateProgram(programId, programData) {
+    try {
+      console.log('Updating program via Cloud Function...', programId);
+      
+      // Get the Cloud Function reference
+      const updateProgramFunction = httpsCallable(functions, 'updateProgram');
+      
+      // Call the Cloud Function
+      const result = await updateProgramFunction({
+        programId: programId,
+        programData: programData
+      });
+      
+      console.log('Program updated successfully:', result.data);
+      
+      // Clear cached programs to force refresh
+      this.programsCache = null;
+      this.programsCacheTime = 0;
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error updating program:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to update program. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid program data provided.';
+      } else if (error.code === 'functions/permission-denied') {
+        errorMessage = 'You do not have permission to update this program.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to update programs.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Cancel program
+  async cancelProgram(programId, userEmail) {
+    try {
+      console.log('Canceling program via Cloud Function...', programId, userEmail);
+      
+      // Get the Cloud Function reference
+      const cancelProgramFunction = httpsCallable(functions, 'cancelProgram');
+      
+      // Call the Cloud Function
+      const result = await cancelProgramFunction({
+        programId: programId,
+        userEmail: userEmail
+      });
+      
+      console.log('Program cancelled successfully:', result.data);
+      
+      // Clear cached programs to force refresh
+      this.programsCache = null;
+      this.programsCacheTime = 0;
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error canceling program:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to cancel program. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid program data provided.';
+      } else if (error.code === 'functions/permission-denied') {
+        errorMessage = 'You do not have permission to cancel this program.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to cancel programs.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Get user notifications
+  async getUserNotifications(userEmail, page = 1, limit = 20) {
+    try {
+      console.log('Getting user notifications via Cloud Function...', userEmail, page, limit);
+      
+      // Get the Cloud Function reference
+      const getUserNotificationsFunction = httpsCallable(functions, 'getUserNotifications');
+      
+      // Call the Cloud Function
+      const result = await getUserNotificationsFunction({
+        userEmail: userEmail,
+        page: page,
+        limit: limit
+      });
+      
+      console.log('User notifications retrieved successfully:', result.data);
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error getting user notifications:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to get notifications. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid request data.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to view notifications.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Mark notification as read
+  async markNotificationAsRead(notificationId, userEmail) {
+    try {
+      console.log('Marking notification as read via Cloud Function...', notificationId, userEmail);
+      
+      // Get the Cloud Function reference
+      const markNotificationAsReadFunction = httpsCallable(functions, 'markNotificationAsRead');
+      
+      // Call the Cloud Function
+      const result = await markNotificationAsReadFunction({
+        notificationId: notificationId,
+        userEmail: userEmail
+      });
+      
+      console.log('Notification marked as read successfully:', result.data);
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to mark notification as read. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid notification data.';
+      } else if (error.code === 'functions/permission-denied') {
+        errorMessage = 'You do not have permission to mark this notification as read.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to manage notifications.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Mark all notifications as read
+  async markAllNotificationsAsRead(userEmail) {
+    try {
+      console.log('Marking all notifications as read via Cloud Function...', userEmail);
+      
+      // Get the Cloud Function reference
+      const markAllNotificationsAsReadFunction = httpsCallable(functions, 'markAllNotificationsAsRead');
+      
+      // Call the Cloud Function
+      const result = await markAllNotificationsAsReadFunction({
+        userEmail: userEmail
+      });
+      
+      console.log('All notifications marked as read successfully:', result.data);
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to mark all notifications as read. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid request data.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to manage notifications.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
+  // Delete notification
+  async deleteNotification(notificationId, userEmail) {
+    try {
+      console.log('Deleting notification via Cloud Function...', notificationId, userEmail);
+      
+      // Get the Cloud Function reference
+      const deleteNotificationFunction = httpsCallable(functions, 'deleteNotification');
+      
+      // Call the Cloud Function
+      const result = await deleteNotificationFunction({
+        notificationId: notificationId,
+        userEmail: userEmail
+      });
+      
+      console.log('Notification deleted successfully:', result.data);
+      
+      return result.data;
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to delete notification. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid notification data.';
+      } else if (error.code === 'functions/permission-denied') {
+        errorMessage = 'You do not have permission to delete this notification.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to manage notifications.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
   // Get featured programs (for home page)
   async getFeaturedPrograms(limit = 6) {
     try {

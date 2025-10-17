@@ -42,6 +42,21 @@ const routes = [
     component: () => import('../components/pages/LaunchProgramPage.vue'),
     meta: { requiresAuth: true, requiresRole: 'organizer' }
   },
+  { 
+    path: '/edit-program/:id', 
+    name: 'edit-program', 
+    component: () => import('../components/pages/EditProgramPage.vue'),
+    props: true,
+    meta: { requiresAuth: true, requiresRole: 'organizer' }
+  },
+  
+  // Notification routes (accessible by both roles)
+  { 
+    path: '/notifications', 
+    name: 'notifications', 
+    component: () => import('../components/pages/NotificationPage.vue'),
+    meta: { requiresAuth: true }
+  },
   
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ];
