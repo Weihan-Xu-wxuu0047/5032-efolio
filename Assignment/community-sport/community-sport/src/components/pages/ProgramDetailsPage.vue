@@ -140,6 +140,125 @@
             </div>
           </div>
 
+          <!-- Navigation Map Section -->
+          <div class="card mb-4" v-if="program && program.venue && program.venue.lat && program.venue.lng">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-map me-2"></i>Get Directions
+              </h5>
+            </div>
+            <div class="card-body">
+              <!-- Navigation Controls -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div class="d-flex gap-2">
+                    <button
+                      @click="useCurrentLocation"
+                      class="btn btn-primary"
+                      :disabled="gettingLocation || !isGeolocationSupported"
+                    >
+                      <span v-if="gettingLocation" class="spinner-border spinner-border-sm me-2" role="status"></span>
+                      <i v-else class="bi bi-geo-alt-fill me-2"></i>
+                      {{ gettingLocation ? 'Getting Location...' : 'From Current Location' }}
+                    </button>
+                    <button
+                      @click="clearRoute"
+                      class="btn btn-outline-secondary"
+                      :disabled="!hasRoute"
+                    >
+                      <i class="bi bi-x-lg me-2"></i>Clear Route
+                    </button>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="input-group">
+                    <input
+                      type="text"
+                      class="form-control"
+                      v-model="startLocationQuery"
+                      @input="searchStartLocation"
+                      @focus="showStartSuggestions = startLocationSuggestions.length > 0"
+                      placeholder="Or enter start address..."
+                      autocomplete="off"
+                    />
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      @click="clearStartLocation"
+                      :disabled="!startLocationQuery"
+                    >
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                  
+                  <!-- Start location suggestions dropdown -->
+                  <div 
+                    v-if="showStartSuggestions && startLocationSuggestions.length > 0" 
+                    class="position-absolute w-100 bg-white border rounded-bottom shadow-lg mt-1"
+                    style="z-index: 1000; max-height: 200px; overflow-y: auto;"
+                  >
+                    <div
+                      v-for="suggestion in startLocationSuggestions"
+                      :key="suggestion.id"
+                      class="p-2 border-bottom suggestion-item"
+                      @click="selectStartLocation(suggestion)"
+                      style="cursor: pointer;"
+                    >
+                      <div class="fw-medium small">{{ suggestion.place_name }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Route Information -->
+              <div v-if="routeInfo" class="alert alert-info mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div>
+                    <i class="bi bi-route me-2"></i>
+                    <strong>{{ routeInfo.distance }}</strong> • {{ routeInfo.duration }}
+                  </div>
+                  <div class="text-end">
+                    <small class="text-muted">{{ routeInfo.mode }}</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Map Container -->
+              <div class="position-relative">
+                <div 
+                  ref="navigationMapContainer" 
+                  class="navigation-map-container border rounded"
+                  style="height: 400px; width: 100%;"
+                ></div>
+                
+                <!-- Map loading overlay -->
+                <div 
+                  v-if="mapLoading" 
+                  class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75 rounded"
+                  style="z-index: 1000;"
+                >
+                  <div class="text-center">
+                    <div class="spinner-border text-primary mb-2" role="status">
+                      <span class="visually-hidden">Loading map...</span>
+                    </div>
+                    <div class="small text-muted">Loading navigation map...</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Map Instructions -->
+              <div class="mt-3">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-info-circle text-primary mt-1"></i>
+                  <div class="small text-muted">
+                    <strong>How to use:</strong> Click "From Current Location" to get directions from where you are, 
+                    or enter a custom address in the search box. Click anywhere on the map to set a custom start point.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Comments Section -->
           <div class="card">
             <div class="card-header">
@@ -338,12 +457,14 @@
 </template>
 
 <script setup>
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import authService from '../../services/AuthService.js';
 import dataService from '../../services/DataService.js';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 const route = useRoute();
 const router = useRouter();
@@ -360,6 +481,25 @@ const commentForm = ref({
   rating: 0,
   comment: ''
 });
+
+// Navigation Map State
+const navigationMap = ref(null);
+const navigationMapContainer = ref(null);
+const mapLoading = ref(true);
+const gettingLocation = ref(false);
+const hasRoute = ref(false);
+const routeInfo = ref(null);
+
+// Start Location Search
+const startLocationQuery = ref('');
+const startLocationSuggestions = ref([]);
+const showStartSuggestions = ref(false);
+const isSearchingStart = ref(false);
+
+// Map Markers and Route
+const startMarker = ref(null);
+const endMarker = ref(null);
+const routeSource = ref(null);
 
 // Computed
 const averageRating = computed(() => {
@@ -383,6 +523,345 @@ const isCommentFormValid = computed(() => {
          commentForm.value.comment.trim().length > 0 && 
          commentForm.value.comment.length <= 500;
 });
+
+// Check if geolocation is supported
+const isGeolocationSupported = computed(() => {
+  return typeof navigator !== 'undefined' && 'geolocation' in navigator;
+});
+
+// Navigation Map Methods
+async function initializeNavigationMap() {
+  try {
+    // Set Mapbox access token
+    mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_API_TOKEN;
+    
+    if (!mapboxgl.accessToken) {
+      console.error('Mapbox access token not found');
+      mapLoading.value = false;
+      return;
+    }
+
+    // Wait for DOM to be ready
+    await nextTick();
+    
+    // Wait a bit more for DOM to be fully ready
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    if (!navigationMapContainer.value) {
+      console.error('Navigation map container not found, retrying...');
+      await nextTick();
+      if (!navigationMapContainer.value) {
+        console.error('Navigation map container still not found after retry');
+        mapLoading.value = false;
+        return;
+      }
+    }
+
+    // Initialize map centered on venue location
+    const venueLocation = [program.value.venue.lng, program.value.venue.lat];
+    
+    navigationMap.value = new mapboxgl.Map({
+      container: navigationMapContainer.value,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: venueLocation,
+      zoom: 14
+    });
+
+    // Add navigation controls
+    navigationMap.value.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Wait for map to load
+    navigationMap.value.on('load', () => {
+      // Add venue marker (destination)
+      endMarker.value = new mapboxgl.Marker({ color: '#dc3545' })
+        .setLngLat(venueLocation)
+        .setPopup(new mapboxgl.Popup().setHTML(`
+          <div class="p-2">
+            <strong>${program.value.venue.name}</strong><br>
+            <small>${program.value.venue.address}</small>
+          </div>
+        `))
+        .addTo(navigationMap.value);
+
+      mapLoading.value = false;
+    });
+
+    // Add click event for custom start location
+    navigationMap.value.on('click', handleMapClick);
+
+    console.log('Navigation map initialized successfully');
+  } catch (error) {
+    console.error('Error initializing navigation map:', error);
+    mapLoading.value = false;
+  }
+}
+
+// Get user's current location
+async function useCurrentLocation() {
+  if (!isGeolocationSupported.value) {
+    alert('Geolocation is not supported by this browser.');
+    return;
+  }
+
+  gettingLocation.value = true;
+  
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const { latitude, longitude } = position.coords;
+      await showRoute([longitude, latitude], [program.value.venue.lng, program.value.venue.lat]);
+      gettingLocation.value = false;
+    },
+    (error) => {
+      console.error('Error getting location:', error);
+      alert('Unable to get your current location. Please try entering an address manually.');
+      gettingLocation.value = false;
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 300000 // 5 minutes
+    }
+  );
+}
+
+// Search for start location addresses
+let startSearchTimeout = null;
+
+async function searchStartLocation() {
+  if (!startLocationQuery.value.trim() || startLocationQuery.value.length < 3) {
+    startLocationSuggestions.value = [];
+    showStartSuggestions.value = false;
+    return;
+  }
+
+  // Clear previous timeout
+  if (startSearchTimeout) {
+    clearTimeout(startSearchTimeout);
+  }
+
+  // Debounce the search
+  startSearchTimeout = setTimeout(async () => {
+    await performStartLocationSearch();
+  }, 300);
+}
+
+async function performStartLocationSearch() {
+  isSearchingStart.value = true;
+  
+  try {
+    const response = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(startLocationQuery.value)}.json?` +
+      `access_token=${mapboxgl.accessToken}&` +
+      `country=AU&` +
+      `types=address,poi&` +
+      `limit=5&` +
+      `autocomplete=true`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch address suggestions');
+    }
+
+    const data = await response.json();
+    startLocationSuggestions.value = data.features.map(feature => ({
+      id: feature.id,
+      place_name: feature.place_name,
+      center: feature.center,
+      context: feature.context || [],
+      properties: feature.properties || {}
+    }));
+    
+    showStartSuggestions.value = startLocationSuggestions.value.length > 0;
+  } catch (error) {
+    console.error('Error searching start location:', error);
+    startLocationSuggestions.value = [];
+    showStartSuggestions.value = false;
+  } finally {
+    isSearchingStart.value = false;
+  }
+}
+
+// Select start location from suggestions
+async function selectStartLocation(suggestion) {
+  startLocationQuery.value = suggestion.place_name;
+  showStartSuggestions.value = false;
+  
+  // Show route from selected location to venue
+  await showRoute(suggestion.center, [program.value.venue.lng, program.value.venue.lat]);
+}
+
+// Handle map click to set custom start location
+async function handleMapClick(event) {
+  const { lng, lat } = event.lngLat;
+  
+  try {
+    // Perform reverse geocoding to get address
+    const response = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+      `access_token=${mapboxgl.accessToken}&` +
+      `country=AU&` +
+      `types=address,poi&` +
+      `limit=1`
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.features && data.features.length > 0) {
+        startLocationQuery.value = data.features[0].place_name;
+      }
+    }
+    
+    // Show route from clicked location to venue
+    await showRoute([lng, lat], [program.value.venue.lng, program.value.venue.lat]);
+  } catch (error) {
+    console.error('Error with map click:', error);
+    // Still show route even if reverse geocoding fails
+    await showRoute([lng, lat], [program.value.venue.lng, program.value.venue.lat]);
+  }
+}
+
+// Show route between two points
+async function showRoute(start, end) {
+  try {
+    // Get route from Mapbox Directions API
+    const response = await fetch(
+      `https://api.mapbox.com/directions/v5/mapbox/driving/${start[0]},${start[1]};${end[0]},${end[1]}?` +
+      `access_token=${mapboxgl.accessToken}&` +
+      `geometries=geojson&` +
+      `overview=full&` +
+      `steps=true`
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to get route');
+    }
+
+    const data = await response.json();
+    
+    if (data.routes && data.routes.length > 0) {
+      const route = data.routes[0];
+      
+      // Update route info
+      routeInfo.value = {
+        distance: formatDistance(route.distance),
+        duration: formatDuration(route.duration),
+        mode: 'Driving'
+      };
+
+      // Add start marker
+      if (startMarker.value) {
+        startMarker.value.remove();
+      }
+      
+      startMarker.value = new mapboxgl.Marker({ color: '#28a745' })
+        .setLngLat(start)
+        .setPopup(new mapboxgl.Popup().setHTML('<div class="p-2"><strong>Start Location</strong></div>'))
+        .addTo(navigationMap.value);
+
+      // Add route to map
+      if (routeSource.value) {
+        navigationMap.value.removeLayer('route');
+        navigationMap.value.removeSource('route');
+      }
+
+      navigationMap.value.addSource('route', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: route.geometry
+        }
+      });
+
+      navigationMap.value.addLayer({
+        id: 'route',
+        type: 'line',
+        source: 'route',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#007cbf',
+          'line-width': 5,
+          'line-opacity': 0.8
+        }
+      });
+
+      // Fit map to show entire route
+      const coordinates = route.geometry.coordinates;
+      const bounds = coordinates.reduce((bounds, coord) => {
+        return bounds.extend(coord);
+      }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+
+      navigationMap.value.fitBounds(bounds, {
+        padding: 50
+      });
+
+      hasRoute.value = true;
+      routeSource.value = 'route';
+    }
+  } catch (error) {
+    console.error('Error showing route:', error);
+    alert('Unable to calculate route. Please try again.');
+  }
+}
+
+// Clear route and markers
+function clearRoute() {
+  // Remove start marker
+  if (startMarker.value) {
+    startMarker.value.remove();
+    startMarker.value = null;
+  }
+
+  // Remove route from map
+  if (routeSource.value && navigationMap.value.getLayer('route')) {
+    navigationMap.value.removeLayer('route');
+    navigationMap.value.removeSource('route');
+    routeSource.value = null;
+  }
+
+  // Clear route info
+  routeInfo.value = null;
+  hasRoute.value = false;
+  startLocationQuery.value = '';
+
+  // Reset map view to venue
+  if (navigationMap.value && program.value.venue) {
+    navigationMap.value.flyTo({
+      center: [program.value.venue.lng, program.value.venue.lat],
+      zoom: 14
+    });
+  }
+}
+
+// Clear start location search
+function clearStartLocation() {
+  startLocationQuery.value = '';
+  startLocationSuggestions.value = [];
+  showStartSuggestions.value = false;
+}
+
+// Helper functions
+function formatDistance(meters) {
+  if (meters < 1000) {
+    return `${Math.round(meters)} m`;
+  } else {
+    return `${(meters / 1000).toFixed(1)} km`;
+  }
+}
+
+function formatDuration(seconds) {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes} min`;
+  } else {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  }
+}
 
 // Methods
 function formatCost(cost, costUnit) {
@@ -619,10 +1098,22 @@ onMounted(async () => {
     program.value = await dataService.getProgram(route.params.id);
     if (program.value) {
       await loadComments();
+      
+      // Initialize navigation map if venue has coordinates
+      if (program.value.venue && program.value.venue.lat && program.value.venue.lng) {
+        await initializeNavigationMap();
+      }
     }
   } catch (error) {
     console.error('Error loading program:', error);
     program.value = null;
+  }
+});
+
+// Cleanup map on unmount
+onUnmounted(() => {
+  if (navigationMap.value) {
+    navigationMap.value.remove();
   }
 });
 </script>
@@ -770,5 +1261,38 @@ body.modal-open {
 
 .badge {
   border-radius: 6px;
+}
+
+/* Navigation Map Styles */
+.navigation-map-container {
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: crosshair;
+  position: relative;
+}
+
+.navigation-map-container:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: box-shadow 0.2s ease;
+}
+
+.suggestion-item:hover {
+  background-color: #f8f9fa;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none !important;
+}
+
+/* Route info styling */
+.alert-info {
+  background-color: #e3f2fd;
+  border-color: #bbdefb;
+  color: #1565c0;
+}
+
+/* Position relative for dropdown */
+.col-md-6 {
+  position: relative;
 }
 </style>
