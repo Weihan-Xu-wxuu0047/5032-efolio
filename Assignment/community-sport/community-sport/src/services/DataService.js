@@ -685,6 +685,65 @@ class DataService {
     }
   }
 
+  // Upload image to S3
+  async uploadImageToS3(file, programId = null) {
+    try {
+      console.log('Uploading image to S3...', file.name, programId);
+      
+      // Step 1: Get presigned URL from cloud function
+      const generateUploadUrlFunction = httpsCallable(functions, 'generateImageUploadUrl');
+      const urlResult = await generateUploadUrlFunction({
+        fileName: file.name,
+        fileType: file.type,
+        programId: programId
+      });
+      
+      if (!urlResult.data.success) {
+        throw new Error('Failed to generate upload URL');
+      }
+      
+      const { uploadUrl, publicUrl } = urlResult.data;
+      console.log('Got presigned URL, uploading to S3...');
+      
+      // Step 2: Upload file directly to S3 using presigned URL
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type
+        }
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 upload failed with status ${uploadResponse.status}`);
+      }
+      
+      console.log('Image uploaded successfully to S3:', publicUrl);
+      
+      return {
+        success: true,
+        url: publicUrl,
+        key: urlResult.data.key,
+        fileName: file.name
+      };
+      
+    } catch (error) {
+      console.error('Error uploading image to S3:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to upload image. Please try again.';
+      if (error.code === 'functions/invalid-argument') {
+        errorMessage = error.message || 'Invalid file data.';
+      } else if (error.code === 'functions/unauthenticated') {
+        errorMessage = 'Please log in to upload images.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+
   // Get featured programs (for home page)
   async getFeaturedPrograms(limit = 6) {
     try {

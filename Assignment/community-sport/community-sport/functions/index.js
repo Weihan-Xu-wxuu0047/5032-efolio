@@ -7,13 +7,28 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
+// Load environment variables from .env.local for local development
+require('dotenv').config({ path: '.env.local' });
+
 const {setGlobalOptions} = require("firebase-functions");
 const {onCall} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const {S3Client, PutObjectCommand} = require("@aws-sdk/client-s3");
+const {getSignedUrl} = require("@aws-sdk/s3-request-presigner");
 
 // Initialize Firebase Admin SDK
 admin.initializeApp();
+
+// Initialize S3 Client
+// Note: AWS credentials are set via Firebase Functions config
+const s3Client = new S3Client({
+  region: "ap-southeast-2",
+  credentials: {
+    accessKeyId: "AKIA4ZPZU223S7RIND6Q",
+    secretAccessKey: "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"
+  }
+});
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -865,6 +880,78 @@ exports.deleteNotification = onCall(async (request) => {
     });
     
     throw new Error(`Failed to delete notification: ${error.message}`);
+  }
+});
+
+// Generate S3 Presigned URL for Image Upload
+exports.generateImageUploadUrl = onCall(async (request) => {
+  try {
+    const { fileName, fileType, programId } = request.data;
+
+    // Validate input
+    if (!fileName || !fileType) {
+      throw new Error("Missing required fields: fileName and fileType are required");
+    }
+
+    // Validate file type (only images)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(fileType.toLowerCase())) {
+      throw new Error(`Invalid file type: ${fileType}. Only images are allowed (JPG, PNG, GIF, WEBP).`);
+    }
+
+    logger.info("Generating presigned URL for image upload", { fileName, fileType, programId });
+
+    // Generate unique filename with timestamp to avoid collisions
+    const timestamp = Date.now();
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const folder = programId || 'temp';
+    const key = `programs/${folder}/${timestamp}-${sanitizedFileName}`;
+    
+    const bucketName = "5032-a3-image-bucket";
+
+    // Create S3 PutObject command
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+      ContentType: fileType,
+      // Add metadata
+      Metadata: {
+        uploadedBy: request.auth?.uid || "anonymous",
+        uploadedAt: new Date().toISOString(),
+        programId: programId || "none"
+      }
+    });
+
+    // Generate presigned URL (expires in 5 minutes)
+    const presignedUrl = await getSignedUrl(s3Client, command, { 
+      expiresIn: 300 // 5 minutes
+    });
+
+    // Generate the public URL for accessing the image after upload
+    const region = process.env.AWS_REGION || "ap-southeast-2";
+    const publicUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+
+    logger.info("Presigned URL generated successfully", { 
+      fileName, 
+      key, 
+      programId 
+    });
+
+    return {
+      success: true,
+      uploadUrl: presignedUrl,
+      publicUrl: publicUrl,
+      key: key,
+      message: "Presigned URL generated successfully"
+    };
+
+  } catch (error) {
+    logger.error("Error generating presigned URL", { 
+      error: error.message,
+      fileName: request.data?.fileName
+    });
+    
+    throw new Error(`Failed to generate upload URL: ${error.message}`);
   }
 });
 

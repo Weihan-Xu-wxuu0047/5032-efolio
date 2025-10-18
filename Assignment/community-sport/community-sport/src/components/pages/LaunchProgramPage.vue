@@ -1572,20 +1572,21 @@ function handleImageUpload(event) {
     reader.readAsDataURL(file);
   });
   
-  // Update form.images with file names (placeholder URLs)
-  form.images = selectedImageFiles.value.map(file => `/assets/images/${file.name}`);
+  // Note: Images will be uploaded to S3 when the program is submitted
+  // For now, just store the files for preview
+  form.images = []; // Will be populated with S3 URLs after upload
   
   // Show success message
   if (validFiles.length > 0) {
     imageUploadStatus.value = {
       type: 'success',
-      message: `${validFiles.length} image(s) added successfully.`
+      message: `${validFiles.length} image(s) ready for upload. Images will be uploaded when you submit the program.`
     };
     
-    // Clear status after 3 seconds
+    // Clear status after 5 seconds
     setTimeout(() => {
       imageUploadStatus.value = null;
-    }, 3000);
+    }, 5000);
   }
   
   // Validate images field
@@ -1653,6 +1654,41 @@ async function handleSubmit() {
       return;
     }
 
+    // Upload images to S3 if any
+    const uploadedImageUrls = [];
+    if (selectedImageFiles.value.length > 0) {
+      imageUploadStatus.value = {
+        type: 'uploading',
+        message: `Uploading ${selectedImageFiles.value.length} image(s) to storage...`
+      };
+      
+      for (let i = 0; i < selectedImageFiles.value.length; i++) {
+        const file = selectedImageFiles.value[i];
+        try {
+          const uploadResult = await dataService.uploadImageToS3(file, null); // programId will be set after creation
+          uploadedImageUrls.push(uploadResult.url);
+          
+          imageUploadStatus.value = {
+            type: 'uploading',
+            message: `Uploading images... (${i + 1}/${selectedImageFiles.value.length})`
+          };
+        } catch (uploadError) {
+          console.error(`Failed to upload ${file.name}:`, uploadError);
+          // Continue with other images
+        }
+      }
+      
+      imageUploadStatus.value = {
+        type: 'success',
+        message: `${uploadedImageUrls.length} of ${selectedImageFiles.value.length} image(s) uploaded successfully.`
+      };
+      
+      // Clear after a delay
+      setTimeout(() => {
+        imageUploadStatus.value = null;
+      }, 3000);
+    }
+
     // Format schedule data to match required structure
     const scheduleData = form.schedule.days.map(day => ({
       day: day.charAt(0).toUpperCase() + day.slice(1), // Capitalize first letter
@@ -1691,7 +1727,7 @@ async function handleSubmit() {
         email: form.contact.email.trim(),
         phone: form.contact.phone.trim()
       },
-      images: form.images, // Empty array for now
+      images: uploadedImageUrls, // S3 URLs of uploaded images
       maxParticipants: form.maxParticipants
     };
 
